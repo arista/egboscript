@@ -184,9 +184,9 @@ pub fn parse_plus<F, R>(f: F, cursor: Cursor, env: &Env, state: &mut State) -> O
 where
     F: ParserFn<R>
 {
-    let mut ret = Vec::<Parsed<R>>::new();
     let mut c = cursor;
     if let Some(ParseResult {next, parsed}) = f(cursor, env, state) {
+        let mut ret = Vec::<Parsed<R>>::new();
         c = next;
         ret.push(parsed);
         while let Some(ParseResult {next, parsed}) = f(cursor, env, state) {
