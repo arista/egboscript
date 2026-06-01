@@ -258,7 +258,7 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     });
 
     //--------------------------------------------------
-    // Int literal
+    // Int Literal
     
     let underscore_digit = rule::<DigitOrUnderscore, _>(RuleName::UnderscorDigit, |p| {
         Some(p.ch('_')?.with_value(DigitOrUnderscore::Underscore))
@@ -358,8 +358,14 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     //--------------------------------------------------
     // Expressions
 
+    let expression = rule::<ast::Expression, _>(RuleName::Expression, |p| {
+        if let Some(r) = p.parse(boolean_literal) {Some(r)}
+        else if let Some(r) = p.parse(int_literal) {Some(r)}
+        else {None}
+    });
+
     // Main parse target
-    ctx.parse(int_literal)
+    ctx.parse(expression)
 }
 
 pub enum RuleName {
@@ -384,6 +390,7 @@ pub enum RuleName {
     BinaryDigits,
     BinaryLiteral,
     IntLiteral,
+    Expression,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
