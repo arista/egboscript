@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 use egbo::parser;
+use egbo::peg_parser;
 
 #[derive(Parser)]
 #[command(name = "egbo")]
@@ -26,7 +27,7 @@ fn main() -> std::io::Result<()> {
         Command::Compile { input, output } => {
             let contents = fs::read_to_string(&input)?;
 
-            let mut ctx = parser::RuleCtx::new(contents.as_str());
+            let mut ctx = peg_parser::RuleCtx::new(contents.as_str());
             let result = parser::parse(&mut ctx);
 
             println!("Result: {:#?}", result);
