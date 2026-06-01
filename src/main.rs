@@ -3,6 +3,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
+use egbo::parser;
+
 #[derive(Parser)]
 #[command(name = "egbo")]
 struct Cli {
@@ -23,6 +25,12 @@ fn main() -> std::io::Result<()> {
     match cli.command {
         Command::Compile { input, output } => {
             let contents = fs::read_to_string(&input)?;
+
+            let mut ctx = parser::RuleCtx::new(contents.as_str());
+            let result = parser::parse(&mut ctx);
+
+            println!("Result: {:#?}", result);
+            
             fs::write(&output, contents)?;
         }
     }
