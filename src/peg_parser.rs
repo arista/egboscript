@@ -1,11 +1,11 @@
 use crate::parser::RuleName;
 
-pub struct RuleCtx<'a> {
+pub struct PegParser<'a> {
     source: &'a str,
     pos: usize,
 }
 
-impl<'a> RuleCtx<'a> {
+impl<'a> PegParser<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
@@ -15,7 +15,7 @@ impl<'a> RuleCtx<'a> {
 
     // Create and register a Rule
     pub fn add_rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Rule<R, F>
-    where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
         Rule { _rule_name: rule_name, rule }
     }
     
@@ -77,7 +77,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     pub fn opt<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Option<R>>>
-    where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
         self.to_parsed(|p| {
             if let Some(Parsed {range: _, value}) = (rule.rule)(p) {
                 Some(Some(value))
@@ -89,7 +89,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     pub fn star<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Vec<Parsed<R>>>>
-    where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
         self.to_parsed(|p| {
             let mut ret = Vec::<Parsed<R>>::new();
             while let Some(parsed) = (rule.rule)(p) {
@@ -100,7 +100,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     pub fn plus<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Vec<Parsed<R>>>>
-    where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
         self.to_parsed(|p| {
             let first_parsed = (rule.rule)(p)?;
             let mut ret = Vec::<Parsed<R>>::new();
@@ -113,7 +113,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     pub fn rule<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<R>>
-    where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
         self.to_parsed(|p| Some((rule.rule)(p)?.value))
     }
 }
@@ -223,7 +223,7 @@ impl CharClass {
 }
 
 pub struct Rule<R, F>
-where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
+where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
     _rule_name: RuleName,
     rule: F,
 }

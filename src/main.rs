@@ -27,7 +27,7 @@ fn main() -> std::io::Result<()> {
         Command::Compile { input, output } => {
             let contents = fs::read_to_string(&input)?;
 
-            let mut ctx = peg_parser::RuleCtx::new(contents.as_str());
+            let mut ctx = peg_parser::PegParser::new(contents.as_str());
             let result = parser::parse(&mut ctx);
 
             println!("Result: {:#?}", result);

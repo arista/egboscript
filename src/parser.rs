@@ -2,7 +2,7 @@
 #![allow(unused)]
 
 use crate::ast;
-use crate::peg_parser::{RuleCtx, CharClass, Rule, Parsed};
+use crate::peg_parser::{PegParser, CharClass, Rule, Parsed};
 
 // Combines the given first and rest into a single Vec with a range spanning both
 pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Parsed<Vec<Parsed<R>>> {
@@ -21,7 +21,7 @@ pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u3
     })
 }
 
-pub fn parse(p: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
+pub fn parse(p: &mut PegParser) -> Option<Parsed<ast::Expression>> {
 
     let ws_char: Rule<(),_> = p.add_rule(RuleName::WsChar, |p| Some(p.char_class(WS_CHARS)?.with_value(())));
     let ws: Rule<(),_> = p.add_rule(RuleName::Ws, |p| Some(p.plus(&ws_char)?.with_value(())));
