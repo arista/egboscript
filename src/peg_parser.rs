@@ -1,8 +1,16 @@
 use crate::parser::RuleName;
+use std::collections::HashSet;
 
 pub struct PegParser<'a> {
     source: &'a str,
     pos: usize,
+    rule_names: HashSet<RuleName>
+}
+
+#[derive(Debug)]
+pub enum ParseError {
+    RuleNameUsedMultipleTimes(RuleName),
+    ParseFailed,
 }
 
 impl<'a> PegParser<'a> {
@@ -10,13 +18,20 @@ impl<'a> PegParser<'a> {
         Self {
             source,
             pos: 0,
+            rule_names: HashSet::new(),
         }
     }
 
     // Create and register a Rule
-    pub fn add_rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Rule<R, F>
+    pub fn add_rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Result<Rule<R, F>, ParseError>
     where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
-        Rule { _rule_name: rule_name, rule }
+        if self.rule_names.contains(&rule_name) {
+            Err(ParseError::RuleNameUsedMultipleTimes(rule_name))
+        }
+        else {
+            self.rule_names.insert(rule_name);
+            Ok(Rule { _rule_name: rule_name, rule })
+        }
     }
     
     // Return the character at the current position, None if EOF
