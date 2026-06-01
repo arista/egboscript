@@ -1,83 +1,97 @@
-pub fn parse() -> () {
-}
-
-// Immutable inputs to the parser, including the string to be parsed, parse options, etc.
-pub struct Env<'a> {
+pub struct Parser<'a> {
     source: &'a str,
 }
 
-// Mutable state during parse
-pub struct State {
-}
+impl<'a> Parser<'a> {
+    // Return the character at the cursor, None if EOF
+    pub fn peek(&self, cursor: Cursor) -> Option<char> {
+        self.source[cursor.pos..].chars().next()
+    }
 
-// Immutable cursor
-#[derive(Clone, Copy)]
-pub struct Cursor {
-    // The index of the next char to read
-    pos: usize,
-}
-
-impl Cursor {
-    pub fn peek(&self, env: &Env) -> NextChar {
-        match env.source[self.pos..].chars().next() {
-            Some(ch) => NextChar::Char(ch),
-            None => NextChar::Eof,
+    // Return the character, and the new position of the Cursor after consuming that character
+    pub fn next_char(&self, cursor: Cursor) -> (Option<char>, Cursor) {
+        match self.peek(cursor) {
+            Some(ch) => (Some(ch), cursor.advance(ch)),
+            None => (None, cursor),
         }
     }
-    
-    pub fn next(&self, env: &Env)->NextResult {
-        let next_char = self.peek(env);
-        match next_char {
-            NextChar::Char(ch) => NextResult {
-                ch: next_char,
-                cursor: Cursor {
-                    pos: self.pos + ch.len_utf8(),
-                }
-            },
-            NextChar::Eof => NextResult {
-                ch: next_char,
-                cursor: *self,
-            },
-        }
-    }
-}
 
-pub enum NextChar {
-    Char(char),
-    Eof,
-}
-
-pub struct NextResult {
-    ch: NextChar,
-    cursor: Cursor,
-}
-
-pub struct CharClass {
-    negated: bool,
-    singles: &'static [char],
-    ranges: &'static [(char, char)],
-}
-
-impl CharClass {
-    pub fn matches(&self, ch: char) -> bool {
-        if self.negated {
-            !self.matches_non_negated(ch)
+    pub fn char_class(&mut self, cursor: Cursor, char_class: &CharClass) -> Option<ParseResult<char>> {
+        let (ch_opt, next_cursor) = self.next_char(cursor);
+        if let Some(ch) = ch_opt && char_class.matches(ch) {
+            Some(ParseResult::new(next_cursor, cursor, cursor, ch))
         }
         else {
-            self.matches_non_negated(ch)
+            None
         }
     }
 
-    fn matches_non_negated(&self, ch: char) -> bool {
-        for sch in self.singles {
-            if *sch == ch {return true}
+    pub fn ch(&mut self, cursor: Cursor, match_ch: char) -> Option<ParseResult<char>> {
+        let (ch_opt, next_cursor) = self.next_char(cursor);
+        if let Some(ch) = ch_opt && match_ch == ch {
+            Some(ParseResult::new(next_cursor, cursor, cursor, ch))
         }
-        for (start, end) in self.ranges {
-            if ch >= *start && ch <= *end {return true}
+        else {
+            None
         }
-        false
+    }
+
+    pub fn string(&mut self, cursor: Cursor, str: &'static str) -> Option<ParseResult<&'static str>> {
+        let mut c = cursor;
+        for ch in str.chars() {
+            c = self.ch(c, ch)?.next;
+        }
+        Some(ParseResult::new(c, cursor, c, str))
+    }
+
+    pub fn optional<F, R>(&mut self, cursor: Cursor, f: F) -> Option<ParseResult<Option<Parsed<R>>>>
+    where
+        F: ParserFn<R>
+    {
+        if let Some(ParseResult {next, parsed}) = f(self, cursor) {
+            let ParsedRange {start, end} = parsed.range;
+            Some(ParseResult::new(next, start, end, Some(parsed)))
+        }
+        else {
+            Some(ParseResult::new(cursor, cursor, cursor, None))
+        }
+    }
+
+    pub fn star<F, R>(&mut self, cursor: Cursor, f: F) -> Option<ParseResult<Vec<Parsed<R>>>>
+    where
+        F: ParserFn<R>
+    {
+        let mut v = Vec::<Parsed<R>>::new();
+        let mut c = cursor;
+        while let Some(ParseResult {next, parsed}) = f(self, c) {
+            c = next;
+            let ParsedRange {start, end} = parsed.range;
+            v.push(parsed);
+        }
+        Some(ParseResult::new(c, cursor, c, v))
+    }
+
+    pub fn plus<F, R>(&mut self, cursor: Cursor, f: F) -> Option<ParseResult<Vec<Parsed<R>>>>
+    where
+        F: ParserFn<R>
+    {
+        if let Some(ParseResult {next, parsed}) = f(self, cursor) {
+            let mut v = Vec::<Parsed<R>>::new();
+            v.push(parsed);
+            let mut c = next;
+            while let Some(ParseResult {next, parsed}) = f(self, c) {
+                c = next;
+                let ParsedRange {start, end} = parsed.range;
+                v.push(parsed);
+            }
+            Some(ParseResult::new(c, cursor, c, v))
+        }
+        else {
+            None
+        }
     }
 }
+
 
 pub struct ParseResult<R> {
     // The cursor to use for resuming parsing after this parsed construct
@@ -116,86 +130,44 @@ pub struct ParsedRange {
     end: Cursor,
 }
 
-pub fn parse_char_class(char_class: &CharClass, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<char>> {
-    let next = cursor.next(env);
-    match next.ch {
-        NextChar::Char(ch) => {
-            if char_class.matches(ch) {
-                Some(ParseResult::new(next.cursor, cursor, cursor, ch))
-            }
-            else {None}
-        }
-        _ => {None}
-    }        
+// Immutable cursor
+#[derive(Clone, Copy)]
+pub struct Cursor {
+    // The index of the next char to read
+    pos: usize,
 }
 
-pub fn parse_char(chr: char, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<char>> {
-    let next = cursor.next(env);
-    match next.ch {
-        NextChar::Char(ch) => {
-            if chr == ch {
-                Some(ParseResult::new(next.cursor, cursor, cursor, ch))
-            }
-            else {None}
-        }
-        _ => {None}
-    }        
-}
-
-pub fn parse_str(str: &'static str, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<&'static str>> {
-    let mut c = cursor;
-    for ch in str.chars() {
-        c = parse_char(ch, c, env, state)?.next;
-    }
-    Some(ParseResult::new(c, cursor, c, str))
-}
-
-trait ParserFn<R>: Fn(Cursor, &Env, &mut State) -> Option<ParseResult<R>> {}
-
-pub fn parse_optional<F, R>(f: F, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<Option<Parsed<R>>>>
-where
-    F: ParserFn<R>
-{
-    match f(cursor, env, state) {
-        Some(ParseResult {next, parsed}) => {
-            let ParsedRange {start, end} = parsed.range;
-            Some(ParseResult::new(next, start, end, Some(parsed)))
-        }
-        None => {
-            Some(ParseResult::new(cursor, cursor, cursor, None))
-        }
+impl Cursor {
+    pub fn advance(&self, ch: char) -> Cursor {
+        Cursor {pos: self.pos + ch.len_utf8()}
     }
 }
 
-pub fn parse_star<F, R>(f: F, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<Vec<Parsed<R>>>>
-where
-    F: ParserFn<R>
-{
-    let mut ret = Vec::<Parsed<R>>::new();
-    let mut c = cursor;
-    while let Some(ParseResult {next, parsed}) = f(cursor, env, state) {
-        c = next;
-        ret.push(parsed)
-    }
-    Some(ParseResult::new(c, cursor, c, ret))
+pub struct CharClass {
+    negated: bool,
+    singles: &'static [char],
+    ranges: &'static [(char, char)],
 }
 
-pub fn parse_plus<F, R>(f: F, cursor: Cursor, env: &Env, state: &mut State) -> Option<ParseResult<Vec<Parsed<R>>>>
-where
-    F: ParserFn<R>
-{
-    let mut c = cursor;
-    if let Some(ParseResult {next, parsed}) = f(cursor, env, state) {
-        let mut ret = Vec::<Parsed<R>>::new();
-        c = next;
-        ret.push(parsed);
-        while let Some(ParseResult {next, parsed}) = f(cursor, env, state) {
-            c = next;
-            ret.push(parsed)
+impl CharClass {
+    pub fn matches(&self, ch: char) -> bool {
+        if self.negated {
+            !self.matches_non_negated(ch)
         }
-        Some(ParseResult::new(c, cursor, c, ret))
+        else {
+            self.matches_non_negated(ch)
+        }
     }
-    else {
-        None
+
+    fn matches_non_negated(&self, ch: char) -> bool {
+        for sch in self.singles {
+            if *sch == ch {return true}
+        }
+        for (start, end) in self.ranges {
+            if ch >= *start && ch <= *end {return true}
+        }
+        false
     }
 }
+
+trait ParserFn<R>: Fn(&mut Parser, Cursor) -> Option<ParseResult<R>> {}
