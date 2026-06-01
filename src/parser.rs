@@ -251,9 +251,9 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     //--------------------------------------------------
     // Boolean Literal
     
-    let boolean_literal = rule::<bool, _>(RuleName::BooleanLiteral, |p| {
-        if let Some(r) = p.str("true") {Some(r.with_value(true))}
-        else if let Some(r) = p.str("false") {Some(r.with_value(false))}
+    let boolean_literal = rule::<ast::Expression, _>(RuleName::BooleanLiteral, |p| {
+        if let Some(r) = p.str("true") {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
+        else if let Some(r) = p.str("false") {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
         else {None}
     });
 
@@ -354,6 +354,9 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
             None
         }
     });
+
+    //--------------------------------------------------
+    // Expressions
 
     // Main parse target
     ctx.parse(int_literal)

@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub enum Expression {
-    U32Literal(U32Literal)
+    BooleanLiteral(bool),
+    U32Literal(U32Literal),
 }
 
 impl Expression {
