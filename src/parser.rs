@@ -17,7 +17,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     // Create and register a Rule
-    pub fn rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Rule<R, F>
+    pub fn add_rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Rule<R, F>
     where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
         Rule { rule_name, rule }
     }
@@ -115,7 +115,7 @@ impl<'a> RuleCtx<'a> {
         })
     }
 
-    pub fn parse<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<R>>
+    pub fn rule<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<R>>
     where F: Fn(&mut RuleCtx) -> Option<Parsed<R>> {
         self.to_parsed(|p| Some((rule.rule)(p)?.value))
     }
@@ -250,18 +250,18 @@ pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u3
 
 pub fn parse(p: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
 
-    let ws_char = p.rule::<(), _>(RuleName::WsChar, |p| Some(p.char_class(WS_CHARS)?.with_value(())));
-    let ws = p.rule::<(), _>(RuleName::Ws, |p| Some(p.plus(&ws_char)?.with_value(())));
+    let ws_char: Rule<(),_> = p.add_rule(RuleName::WsChar, |p| Some(p.char_class(WS_CHARS)?.with_value(())));
+    let ws: Rule<(),_> = p.add_rule(RuleName::Ws, |p| Some(p.plus(&ws_char)?.with_value(())));
 
-    let identifier_start_char = p.rule::<char, _>(RuleName::IdentifierStartChar, |p| {
+    let identifier_start_char: Rule<char,_> = p.add_rule(RuleName::IdentifierStartChar, |p| {
         p.char_class(IDENTIFIER_START_CHARS)
     });
-    let identifier_rest_char = p.rule::<char, _>(RuleName::IdentifierRestChar, |p| {
+    let identifier_rest_char: Rule<char,_> = p.add_rule(RuleName::IdentifierRestChar, |p| {
         p.char_class(IDENTIFIER_REST_CHARS)
     });
     
-    let identifier = p.rule::<String, _>(RuleName::Identifier, |p| {
-        let first = p.parse(&identifier_start_char)?;
+    let identifier: Rule<String,_> = p.add_rule(RuleName::Identifier, |p| {
+        let first = p.rule(&identifier_start_char)?;
         let rest = p.star(&identifier_rest_char)?;
         // Collect the Vec<Parsed<char>> into a String
         Some(first_and_rest(first, rest).map_value(|v| v.iter().map(|i| i.value).collect::<String>()))
@@ -270,7 +270,7 @@ pub fn parse(p: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     //--------------------------------------------------
     // Boolean Literal
     
-    let boolean_literal = p.rule::<ast::Expression, _>(RuleName::BooleanLiteral, |p| {
+    let boolean_literal: Rule<ast::Expression,_> = p.add_rule(RuleName::BooleanLiteral, |p| {
         if let Some(r) = p.str("true") {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
         else if let Some(r) = p.str("false") {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
         else {None}
@@ -279,86 +279,86 @@ pub fn parse(p: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     //--------------------------------------------------
     // Int Literal
     
-    let underscore_digit = p.rule::<DigitOrUnderscore, _>(RuleName::UnderscorDigit, |p| {
+    let underscore_digit: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::UnderscorDigit, |p| {
         Some(p.ch('_')?.with_value(DigitOrUnderscore::Underscore))
     });
     
-    let decimal_digit = p.rule::<DigitOrUnderscore, _>(RuleName::DecimalDigit, |p| {
+    let decimal_digit: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::DecimalDigit, |p| {
         Some(p.char_class(DECIMAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
     });
-    let decimal_digit_or_underscore = p.rule::<DigitOrUnderscore, _>(RuleName::DecimalDigitOrUnderscore, |p| {
-        if let Some(r) = p.parse(&underscore_digit) {Some(r)}
-        else {p.parse(&decimal_digit)}
+    let decimal_digit_or_underscore: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::DecimalDigitOrUnderscore, |p| {
+        if let Some(r) = p.rule(&underscore_digit) {Some(r)}
+        else {p.rule(&decimal_digit)}
     });
-    let decimal_digits = p.rule::<u32, _>(RuleName::DecimalDigits, |p| {
-        let first = p.parse(&decimal_digit)?;
+    let decimal_digits: Rule<u32,_> = p.add_rule(RuleName::DecimalDigits, |p| {
+        let first = p.rule(&decimal_digit)?;
         let rest = p.star(&decimal_digit_or_underscore)?;
         Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 10)))
     });
 
     
-    let hex_digit = p.rule::<DigitOrUnderscore, _>(RuleName::HexDigit, |p| {
+    let hex_digit: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::HexDigit, |p| {
         Some(p.char_class(HEX_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
     });
-    let hex_digit_or_underscore = p.rule::<DigitOrUnderscore, _>(RuleName::HexDigitOrUnderscore, |p| {
-        if let Some(r) = p.parse(&underscore_digit) {Some(r)}
-        else {p.parse(&hex_digit)}
+    let hex_digit_or_underscore: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::HexDigitOrUnderscore, |p| {
+        if let Some(r) = p.rule(&underscore_digit) {Some(r)}
+        else {p.rule(&hex_digit)}
     });
-    let hex_digits = p.rule::<u32, _>(RuleName::HexDigits, |p| {
-        let first = p.parse(&hex_digit)?;
+    let hex_digits: Rule<u32,_> = p.add_rule(RuleName::HexDigits, |p| {
+        let first = p.rule(&hex_digit)?;
         let rest = p.star(&hex_digit_or_underscore)?;
         Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 16)))
     });
-    let hex_literal = p.rule::<u32, _>(RuleName::HexLiteral, |p| {
+    let hex_literal: Rule<u32,_> = p.add_rule(RuleName::HexLiteral, |p| {
         let _ = p.str("0x")?;
-        Some(p.parse(&hex_digits)?)
+        Some(p.rule(&hex_digits)?)
     });
     
-    let octal_digit = p.rule::<DigitOrUnderscore, _>(RuleName::OctalDigit, |p| {
+    let octal_digit: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::OctalDigit, |p| {
         Some(p.char_class(OCTAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
     });
-    let octal_digit_or_underscore = p.rule::<DigitOrUnderscore, _>(RuleName::OctalDigitOrUnderscore, |p| {
-        if let Some(r) = p.parse(&underscore_digit) {Some(r)}
-        else {p.parse(&octal_digit)}
+    let octal_digit_or_underscore: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::OctalDigitOrUnderscore, |p| {
+        if let Some(r) = p.rule(&underscore_digit) {Some(r)}
+        else {p.rule(&octal_digit)}
     });
-    let octal_digits = p.rule::<u32, _>(RuleName::OctalDigits, |p| {
-        let first = p.parse(&octal_digit)?;
+    let octal_digits: Rule<u32,_> = p.add_rule(RuleName::OctalDigits, |p| {
+        let first = p.rule(&octal_digit)?;
         let rest = p.star(&octal_digit_or_underscore)?;
         Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 8)))
     });
-    let octal_literal = p.rule::<u32, _>(RuleName::OctalLiteral, |p| {
+    let octal_literal: Rule<u32,_> = p.add_rule(RuleName::OctalLiteral, |p| {
         let _ = p.str("0o")?;
-        Some(p.parse(&octal_digits)?)
+        Some(p.rule(&octal_digits)?)
     });
     
-    let binary_digit = p.rule::<DigitOrUnderscore, _>(RuleName::BinaryDigit, |p| {
+    let binary_digit: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::BinaryDigit, |p| {
         Some(p.char_class(BINARY_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
     });
-    let binary_digit_or_underscore = p.rule::<DigitOrUnderscore, _>(RuleName::BinaryDigitOrUnderscore, |p| {
-        if let Some(r) = p.parse(&underscore_digit) {Some(r)}
-        else {p.parse(&binary_digit)}
+    let binary_digit_or_underscore: Rule<DigitOrUnderscore,_> = p.add_rule(RuleName::BinaryDigitOrUnderscore, |p| {
+        if let Some(r) = p.rule(&underscore_digit) {Some(r)}
+        else {p.rule(&binary_digit)}
     });
-    let binary_digits = p.rule::<u32, _>(RuleName::BinaryDigits, |p| {
-        let first = p.parse(&binary_digit)?;
+    let binary_digits: Rule<u32,_> = p.add_rule(RuleName::BinaryDigits, |p| {
+        let first = p.rule(&binary_digit)?;
         let rest = p.star(&binary_digit_or_underscore)?;
         Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 2)))
     });
-    let binary_literal = p.rule::<u32, _>(RuleName::BinaryLiteral, |p| {
+    let binary_literal: Rule<u32,_> = p.add_rule(RuleName::BinaryLiteral, |p| {
         let _ = p.str("0b")?;
-        Some(p.parse(&binary_digits)?)
+        Some(p.rule(&binary_digits)?)
     });
 
-    let int_literal = p.rule::<ast::Expression, _>(RuleName::IntLiteral, |p| {
-        if let Some(r) = p.parse(&hex_literal) {
+    let int_literal: Rule<ast::Expression,_> = p.add_rule(RuleName::IntLiteral, |p| {
+        if let Some(r) = p.rule(&hex_literal) {
             Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Hex)))
         }
-        else if let Some(r) = p.parse(&octal_literal) {
+        else if let Some(r) = p.rule(&octal_literal) {
             Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Octal)))
         }
-        else if let Some(r) = p.parse(&binary_literal) {
+        else if let Some(r) = p.rule(&binary_literal) {
             Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Binary)))
         }
-        else if let Some(r) = p.parse(&decimal_digits) {
+        else if let Some(r) = p.rule(&decimal_digits) {
             Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Decimal)))
         }
         else {
@@ -369,14 +369,14 @@ pub fn parse(p: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
     //--------------------------------------------------
     // Expressions
 
-    let expression = p.rule::<ast::Expression, _>(RuleName::Expression, |p| {
-        if let Some(r) = p.parse(&boolean_literal) {Some(r)}
-        else if let Some(r) = p.parse(&int_literal) {Some(r)}
+    let expression: Rule<ast::Expression,_> = p.add_rule(RuleName::Expression, |p| {
+        if let Some(r) = p.rule(&boolean_literal) {Some(r)}
+        else if let Some(r) = p.rule(&int_literal) {Some(r)}
         else {None}
     });
 
     // Main parse target
-    p.parse(&expression)
+    p.rule(&expression)
 }
 
 pub enum RuleName {
