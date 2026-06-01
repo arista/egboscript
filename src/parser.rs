@@ -1,6 +1,8 @@
 // FIXME - to reduce noise during initial development
 #![allow(unused)]
 
+use crate::ast;
+
 pub struct RuleCtx<'a> {
     source: &'a str,
     pos: usize,
@@ -64,7 +66,7 @@ impl<'a> RuleCtx<'a> {
     pub fn str(&mut self, match_str: &'static str) -> Option<Parsed<&'static str>> {
         self.to_parsed(|p| {
             for match_ch in match_str.chars() {
-                if let Some(ch) = p.next_char() && match_ch != ch {}
+                if let Some(ch) = p.next_char() && match_ch == ch {}
                 else {return None}
             }
             Some(match_str)
@@ -105,7 +107,7 @@ impl<'a> RuleCtx<'a> {
     }
 
     pub fn parse<R>(&mut self, f: impl FnOnce(&mut Self)->Option<Parsed<R>>) -> Option<Parsed<R>> {
-        f(self)
+        self.to_parsed(|p| Some(f(p)?.value))
     }
 }
 
@@ -228,13 +230,13 @@ pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Pars
 pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
     digits.iter().fold(0, |acc, v| {
         match v.value {
-            DigitOrUnderscore::Digit(d) => (acc * radix) + d,
+            DigitOrUnderscore::Digit(d) => (acc * radix) + d.to_digit(radix).unwrap(),
             _ => acc
         }
     })
 }
 
-pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<u32>> {
+pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<ast::Expression>> {
 
     let ws_char = rule::<(), _>(RuleName::WsChar, |p| Some(p.char_class(WS_CHARS)?.with_value(())));
     let ws = rule::<(), _>(RuleName::Ws, |p| Some(p.plus(ws_char)?.with_value(())));
@@ -246,18 +248,24 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<u32>> {
         Some(first_and_rest(first, rest).map_value(|v| v.iter().map(|i| i.value).collect::<String>()))
     });
 
+    //--------------------------------------------------
+    // Boolean Literal
+    
     let boolean_literal = rule::<bool, _>(RuleName::BooleanLiteral, |p| {
         if let Some(r) = p.str("true") {Some(r.with_value(true))}
         else if let Some(r) = p.str("false") {Some(r.with_value(false))}
         else {None}
     });
 
+    //--------------------------------------------------
+    // Int literal
+    
     let underscore_digit = rule::<DigitOrUnderscore, _>(RuleName::UnderscorDigit, |p| {
         Some(p.ch('_')?.with_value(DigitOrUnderscore::Underscore))
     });
     
     let decimal_digit = rule::<DigitOrUnderscore, _>(RuleName::DecimalDigit, |p| {
-        Some(p.char_class(DECIMAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(v.to_digit(10).unwrap())))
+        Some(p.char_class(DECIMAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
     });
     let decimal_digit_or_underscore = rule::<DigitOrUnderscore, _>(RuleName::DecimalDigitOrUnderscore, |p| {
         p.parse(|p| {
@@ -271,8 +279,84 @@ pub fn parse(ctx: &mut RuleCtx) -> Option<Parsed<u32>> {
         Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 10)))
     });
 
+    
+    let hex_digit = rule::<DigitOrUnderscore, _>(RuleName::HexDigit, |p| {
+        Some(p.char_class(HEX_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+    });
+    let hex_digit_or_underscore = rule::<DigitOrUnderscore, _>(RuleName::HexDigitOrUnderscore, |p| {
+        p.parse(|p| {
+            if let Some(r) = p.parse(underscore_digit) {Some(r)}
+            else {p.parse(hex_digit)}
+        })
+    });
+    let hex_digits = rule::<u32, _>(RuleName::HexDigits, |p| {
+        let first = p.parse(hex_digit)?;
+        let rest = p.star(|p| p.parse(hex_digit_or_underscore))?;
+        Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 16)))
+    });
+    let hex_literal = rule::<u32, _>(RuleName::HexLiteral, |p| {
+        let _ = p.str("0x")?;
+        Some(p.parse(hex_digits)?)
+    });
+    
+    let octal_digit = rule::<DigitOrUnderscore, _>(RuleName::OctalDigit, |p| {
+        Some(p.char_class(OCTAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+    });
+    let octal_digit_or_underscore = rule::<DigitOrUnderscore, _>(RuleName::OctalDigitOrUnderscore, |p| {
+        p.parse(|p| {
+            if let Some(r) = p.parse(underscore_digit) {Some(r)}
+            else {p.parse(octal_digit)}
+        })
+    });
+    let octal_digits = rule::<u32, _>(RuleName::OctalDigits, |p| {
+        let first = p.parse(octal_digit)?;
+        let rest = p.star(|p| p.parse(octal_digit_or_underscore))?;
+        Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 8)))
+    });
+    let octal_literal = rule::<u32, _>(RuleName::OctalLiteral, |p| {
+        let _ = p.str("0o")?;
+        Some(p.parse(octal_digits)?)
+    });
+    
+    let binary_digit = rule::<DigitOrUnderscore, _>(RuleName::BinaryDigit, |p| {
+        Some(p.char_class(BINARY_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+    });
+    let binary_digit_or_underscore = rule::<DigitOrUnderscore, _>(RuleName::BinaryDigitOrUnderscore, |p| {
+        p.parse(|p| {
+            if let Some(r) = p.parse(underscore_digit) {Some(r)}
+            else {p.parse(binary_digit)}
+        })
+    });
+    let binary_digits = rule::<u32, _>(RuleName::BinaryDigits, |p| {
+        let first = p.parse(binary_digit)?;
+        let rest = p.star(|p| p.parse(binary_digit_or_underscore))?;
+        Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 2)))
+    });
+    let binary_literal = rule::<u32, _>(RuleName::BinaryLiteral, |p| {
+        let _ = p.str("0b")?;
+        Some(p.parse(binary_digits)?)
+    });
+
+    let int_literal = rule::<ast::Expression, _>(RuleName::IntLiteral, |p| {
+        if let Some(r) = p.parse(hex_literal) {
+            Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Hex)))
+        }
+        else if let Some(r) = p.parse(octal_literal) {
+            Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Octal)))
+        }
+        else if let Some(r) = p.parse(binary_literal) {
+            Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Binary)))
+        }
+        else if let Some(r) = p.parse(decimal_digits) {
+            Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Decimal)))
+        }
+        else {
+            None
+        }
+    });
+
     // Main parse target
-    ctx.parse(decimal_digits)
+    ctx.parse(int_literal)
 }
 
 pub enum RuleName {
@@ -284,6 +368,19 @@ pub enum RuleName {
     DecimalDigit,
     DecimalDigitOrUnderscore,
     DecimalDigits,
+    HexDigit,
+    HexDigitOrUnderscore,
+    HexDigits,
+    HexLiteral,
+    OctalDigit,
+    OctalDigitOrUnderscore,
+    OctalDigits,
+    OctalLiteral,
+    BinaryDigit,
+    BinaryDigitOrUnderscore,
+    BinaryDigits,
+    BinaryLiteral,
+    IntLiteral,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
@@ -295,8 +392,14 @@ const IDENTIFIER_REST_CHARS: CharClass = CharClass::new()
     .chars(&['_']);
 const DECIMAL_DIGIT: CharClass = CharClass::new()
     .ranges(&[('0', '9')]);
+const HEX_DIGIT: CharClass = CharClass::new()
+    .ranges(&[('0', '9'), ('a', 'f'), ('A', 'F')]);
+const OCTAL_DIGIT: CharClass = CharClass::new()
+    .ranges(&[('0', '7')]);
+const BINARY_DIGIT: CharClass = CharClass::new()
+    .ranges(&[('0', '1')]);
 
 pub enum DigitOrUnderscore {
-    Digit(u32),
+    Digit(char),
     Underscore,
 }
