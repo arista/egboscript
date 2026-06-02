@@ -1,10 +1,8 @@
 use crate::parser::RuleName;
-use std::collections::HashSet;
 
-pub struct PegParser<'a> {
+pub struct PegParserImpl<'a> {
     source: &'a str,
     pos: usize,
-    rule_names: HashSet<RuleName>
 }
 
 #[derive(Debug)]
@@ -13,24 +11,38 @@ pub enum ParseError {
     ParseFailed,
 }
 
-impl<'a> PegParser<'a> {
+pub trait PegParser {
+    fn for_rule<R, RN, F>(&mut self, rule_name: RN, f: F)->Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn char_class(&mut self, char_class: &CharClass)->Option<Parsed<char>>;
+    fn ch(&mut self, match_ch: char)->Option<Parsed<char>>;
+    fn str(&mut self, match_str: &'static str)->Option<Parsed<&'static str>>;
+    fn eof(&mut self)->Option<Parsed<()>>;
+
+    fn opt<R, F>(&mut self, f: F) -> Option<Parsed<Option<R>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn star<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn plus<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<R>;
+}
+
+impl<'a> PegParserImpl<'a> {
     pub fn new(source: &'a str) -> Self {
         Self {
             source,
             pos: 0,
-            rule_names: HashSet::new(),
-        }
-    }
-
-    // Create and register a Rule
-    pub fn add_rule<R, F>(&mut self, rule_name: RuleName, rule: F) -> Result<Rule<R, F>, ParseError>
-    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
-        if self.rule_names.contains(&rule_name) {
-            Err(ParseError::RuleNameUsedMultipleTimes(rule_name))
-        }
-        else {
-            self.rule_names.insert(rule_name);
-            Ok(Rule { _rule_name: rule_name, rule })
         }
     }
     
@@ -47,41 +59,30 @@ impl<'a> PegParser<'a> {
         }
         ret
     }
+}
 
-    // Executes the given function.  If Some is returned, then the result is wrapped with the start and end character positions.  Otherwise, the position is reset to its starting point and None is returned
-    pub fn to_parsed<R>(&mut self, f: impl Fn(&mut Self)->Option<R>) -> Option<Parsed<R>> {
-        let start = self.pos;
-        if let Some(value) = f(self) {
-            Some(Parsed {range: ParsedRange {start, end: self.pos}, value})
-        }
-        else {
-            self.pos = start;
-            None
-        }
+impl<'a> PegParser for PegParserImpl<'a> {
+    fn for_rule<R, RN, F>(&mut self, _rule_name: RN, f: F)->Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
+        f(self)
     }
 
-    pub fn eof(&mut self) -> Option<Parsed<()>> {
-        self.to_parsed(|p| {
-            if let Some(_) = p.peek() {None}
-            else {Some(())}
-        })
-    }
-
-    pub fn ch(&mut self, match_ch: char) -> Option<Parsed<char>> {
-        self.to_parsed(|p| {
-            if let Some(ch) = p.next_char() && ch == match_ch {Some(ch)}
-            else {None}
-        })
-    }
-
-    pub fn char_class(&mut self, char_class: CharClass) -> Option<Parsed<char>> {
+    fn char_class(&mut self, char_class: &CharClass)->Option<Parsed<char>> {
         self.to_parsed(|p| {
             if let Some(ch) = p.next_char() && char_class.matches(ch) {Some(ch)}
             else {None}
         })
     }
-
-    pub fn str(&mut self, match_str: &'static str) -> Option<Parsed<&'static str>> {
+    
+    fn ch(&mut self, match_ch: char)->Option<Parsed<char>> {
+        self.to_parsed(|p| {
+            if let Some(ch) = p.next_char() && ch == match_ch {Some(ch)}
+            else {None}
+        })
+    }
+    
+    fn str(&mut self, match_str: &'static str)->Option<Parsed<&'static str>> {
         self.to_parsed(|p| {
             for match_ch in match_str.chars() {
                 if let Some(ch) = p.next_char() && match_ch == ch {}
@@ -91,10 +92,18 @@ impl<'a> PegParser<'a> {
         })
     }
 
-    pub fn opt<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Option<R>>>
-    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
+    fn eof(&mut self) -> Option<Parsed<()>> {
         self.to_parsed(|p| {
-            if let Some(Parsed {range: _, value}) = (rule.rule)(p) {
+            if let Some(_) = p.peek() {None}
+            else {Some(())}
+        })
+    }
+
+    fn opt<R, F>(&mut self, f: F) -> Option<Parsed<Option<R>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
+        self.to_parsed(|p| {
+            if let Some(Parsed {range: _, value}) = f(p) {
                 Some(Some(value))
             }
             else {
@@ -103,33 +112,44 @@ impl<'a> PegParser<'a> {
         })
     }
 
-    pub fn star<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Vec<Parsed<R>>>>
-    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
+    fn star<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
         self.to_parsed(|p| {
             let mut ret = Vec::<Parsed<R>>::new();
-            while let Some(parsed) = (rule.rule)(p) {
+            while let Some(parsed) = f(p) {
                 ret.push(parsed)
             }
             Some(ret)
         })
     }
 
-    pub fn plus<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<Vec<Parsed<R>>>>
-    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
+    fn plus<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
         self.to_parsed(|p| {
-            let first_parsed = (rule.rule)(p)?;
+            let first_parsed = f(p)?;
             let mut ret = Vec::<Parsed<R>>::new();
             ret.push(first_parsed);
-            while let Some(parsed) = (rule.rule)(p) {
+            while let Some(parsed) = f(p) {
                 ret.push(parsed)
             }
             Some(ret)
         })
     }
 
-    pub fn rule<R, F>(&mut self, rule: &Rule<R, F>) -> Option<Parsed<R>>
-    where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
-        self.to_parsed(|p| Some((rule.rule)(p)?.value))
+    // Executes the given function.  If Some is returned, then the result is wrapped with the start and end character positions.  Otherwise, the position is reset to its starting point and None is returned
+    fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<R> {
+        let start = self.pos;
+        if let Some(value) = f(self) {
+            Some(Parsed {range: ParsedRange {start, end: self.pos}, value})
+        }
+        else {
+            self.pos = start;
+            None
+        }
     }
 }
 
@@ -235,10 +255,4 @@ impl CharClass {
         }
         false
     }
-}
-
-pub struct Rule<R, F>
-where F: Fn(&mut PegParser) -> Option<Parsed<R>> {
-    _rule_name: RuleName,
-    rule: F,
 }
