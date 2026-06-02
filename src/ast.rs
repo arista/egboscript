@@ -2,6 +2,9 @@ use crate::peg_parser::Parsed;
 
 #[derive(Debug)]
 pub enum Expression {
+    CommaExpression(CommaExpression),
+    TernaryExpression(TernaryExpression),
+
     BinaryExpression(BinaryExpression),
     UnaryExpression(UnaryExpression),
     BooleanLiteral(bool),
@@ -11,43 +14,62 @@ pub enum Expression {
 }
 
 impl Expression {
+    pub fn comma_expression(exps: Vec<Parsed<Expression>>) -> Self {
+        Self::CommaExpression(CommaExpression { exps })
+    }
+
+    pub fn ternary_expression(terms: Vec<Parsed<TernaryExpressionTerm>>, if_false: Parsed<Expression>) -> Self {
+        Self::TernaryExpression(TernaryExpression {
+            terms,
+            if_false: Box::new(if_false),
+        })
+    }
+
     pub fn u32_literal(val: u32, radix: Radix) -> Self {
         Self::U32Literal(U32Literal {val, radix})
     }
 
     pub fn binary_expression(first: Parsed<Expression>, rest: Vec<Parsed<BinaryExpressionTerm>>) -> Self {
-        if rest.is_empty() {first.value}
-        else {
-            Self::BinaryExpression(BinaryExpression {
-                first: Box::new(first),
-                rest,
-            })
-        }
+        Self::BinaryExpression(BinaryExpression {
+            first: Box::new(first),
+            rest,
+        })
     }
 
     pub fn unary_expression(ops: Vec<Parsed<UnaryOp>>, exp: Parsed<Expression>) -> Self {
-        if ops.is_empty() {exp.value}
-        else {
-            Self::UnaryExpression(UnaryExpression {
-                ops,
-                exp: Box::new(exp),
-            })
-        }
+        Self::UnaryExpression(UnaryExpression {
+            ops,
+            exp: Box::new(exp),
+        })
     }
 
     pub fn member_expression(first: Parsed<Expression>, rest: Vec<Parsed<MemberOp>>) -> Self {
-        if rest.is_empty() {first.value}
-        else {
-            Self::MemberExpression(MemberExpression{
-                first: Box::new(first),
-                rest
-            })
-        }
+        Self::MemberExpression(MemberExpression{
+            first: Box::new(first),
+            rest
+        })
     }
 
     pub fn identifier_expression(name: String) -> Self {
         Self::IdentifierExpression(IdentifierExpression {name})
     }
+}
+
+#[derive(Debug)]
+pub struct CommaExpression {
+    pub exps: Vec<Parsed<Expression>>
+}
+
+#[derive(Debug)]
+pub struct TernaryExpression {
+    pub terms: Vec<Parsed<TernaryExpressionTerm>>,
+    pub if_false: Box<Parsed<Expression>>
+}
+
+#[derive(Debug)]
+pub struct TernaryExpressionTerm {
+    pub test: Box<Parsed<Expression>>,
+    pub if_true: Box<Parsed<Expression>>,
 }
 
 #[derive(Debug)]
@@ -104,6 +126,21 @@ pub enum BinaryOp {
     BitwiseOr,
     LogicalAnd,
     LogicalOr,
+
+    Assign,
+    PlusAssign,
+    MinusAssign,
+    TimesAssign,
+    DivideAssign,
+    ModAssign,
+    ShiftLeftAssign,
+    LogicalShiftRightAssign,
+    ArithmeticShiftRightAssign,
+    BitwiseAndAssign,
+    BitwiseXorAssign,
+    BitwiseOrAssign,
+    LogicalAndAssign,
+    LogicalOrAssign,
 }
 
 #[derive(Debug, Clone, Copy)]

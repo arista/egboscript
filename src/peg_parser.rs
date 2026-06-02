@@ -2,7 +2,10 @@ use crate::parser::RuleName;
 
 pub struct PegParserImpl<'a> {
     source: &'a str,
+    // The position of the next character to be read
     pos: usize,
+    // The start position of the current parse() call
+    parse_start_pos: usize,
 }
 
 #[derive(Debug)]
@@ -33,6 +36,10 @@ pub trait PegParser {
     where
         F: Fn(&mut Self)->Option<Parsed<R>>;
 
+    fn not<R, F>(&mut self, f: F) -> Option<Parsed<()>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
     fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
         F: Fn(&mut Self)->Option<R>;
@@ -40,6 +47,12 @@ pub trait PegParser {
     fn try_parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
         F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
+    fn parsed<R>(&self, value: R) -> Parsed<R>;
 }
 
 impl<'a> PegParserImpl<'a> {
@@ -47,6 +60,7 @@ impl<'a> PegParserImpl<'a> {
         Self {
             source,
             pos: 0,
+            parse_start_pos: 0,
         }
     }
     
@@ -66,52 +80,84 @@ impl<'a> PegParserImpl<'a> {
 }
 
 impl<'a> PegParser for PegParserImpl<'a> {
+    // Runs for the given named rule.  FIXME - for future, use this to cache parse results (aka "packrat" parsing)
     fn for_rule<R, RN, F>(&mut self, _rule_name: RN, f: F)->Option<Parsed<R>>
     where
         F: Fn(&mut Self)->Option<Parsed<R>> {
         f(self)
     }
 
+    // Executes the given function and returns its result.  If None is returned, then the cursor position is returned to where it was at the beginning of the parse() call.  Within the parse() call, the function can call parsed(value), which will wrap the value in a Parsed whose range spans the parse() call.
+    fn parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>,
+    {
+        let prev_parse_start_pos = self.parse_start_pos;
+
+        let start = self.pos;
+        self.parse_start_pos = start;
+        if let Some(value) = f(self) {
+            self.parse_start_pos = prev_parse_start_pos;
+            Some(value)
+        }
+        else {
+            self.parse_start_pos = prev_parse_start_pos;
+            self.pos = start;
+            None
+        }
+    }
+
+    // When called within a parse() call, wraps the given value with a range that starts at the beginning of the parse() call and ends at the current position
+    fn parsed<R>(&self, value: R) -> Parsed<R> {
+        Parsed {
+            range: ParsedRange {
+                start: self.parse_start_pos,
+                end: self.pos,
+            },
+            value,
+        }
+    }
+
     fn char_class(&mut self, char_class: &CharClass)->Option<Parsed<char>> {
-        self.to_parsed(|p| {
-            if let Some(ch) = p.next_char() && char_class.matches(ch) {Some(ch)}
+        self.parse(|p| {
+            if let Some(ch) = p.next_char() && char_class.matches(ch) {Some(p.parsed(ch))}
             else {None}
         })
     }
     
     fn ch(&mut self, match_ch: char)->Option<Parsed<char>> {
-        self.to_parsed(|p| {
-            if let Some(ch) = p.next_char() && ch == match_ch {Some(ch)}
+        self.parse(|p| {
+            if let Some(ch) = p.next_char() && ch == match_ch {Some(p.parsed(ch))}
             else {None}
         })
     }
     
     fn str(&mut self, match_str: &'static str)->Option<Parsed<&'static str>> {
-        self.to_parsed(|p| {
+        self.parse(|p| {
             for match_ch in match_str.chars() {
                 if let Some(ch) = p.next_char() && match_ch == ch {}
                 else {return None}
             }
-            Some(match_str)
+            Some(p.parsed(match_str))
         })
     }
 
     fn eof(&mut self) -> Option<Parsed<()>> {
-        self.to_parsed(|p| {
+        self.parse(|p| {
             if let Some(_) = p.peek() {None}
-            else {Some(())}
+            else {Some(p.parsed(()))}
         })
     }
 
     fn opt<R, F>(&mut self, f: F) -> Option<Parsed<Option<R>>>
     where
         F: Fn(&mut Self)->Option<Parsed<R>> {
-        self.to_parsed(|p| {
-            if let Some(Parsed {range: _, value}) = f(p) {
-                Some(Some(value))
+        self.parse(|p| {
+            if let Some(Parsed {range, value}) = f(p) {
+                Some(Parsed {range, value: Some(value)})
             }
             else {
-                Some(None)
+                Some(p.parsed(None))
             }
         })
     }
@@ -119,29 +165,42 @@ impl<'a> PegParser for PegParserImpl<'a> {
     fn star<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
     where
         F: Fn(&mut Self)->Option<Parsed<R>> {
-        self.to_parsed(|p| {
+        self.parse(|p| {
             let mut ret = Vec::<Parsed<R>>::new();
             while let Some(parsed) = f(p) {
                 ret.push(parsed)
             }
-            Some(ret)
+            Some(p.parsed(ret))
         })
     }
 
     fn plus<R, F>(&mut self, f: F) -> Option<Parsed<Vec<Parsed<R>>>>
     where
         F: Fn(&mut Self)->Option<Parsed<R>> {
-        self.to_parsed(|p| {
+        self.parse(|p| {
             let first_parsed = f(p)?;
             let mut ret = Vec::<Parsed<R>>::new();
             ret.push(first_parsed);
             while let Some(parsed) = f(p) {
                 ret.push(parsed)
             }
-            Some(ret)
+            Some(p.parsed(ret))
         })
     }
 
+    // Returns None if the function returns Some, or Some(()) if the function returns None
+    fn not<R, F>(&mut self, f: F) -> Option<Parsed<()>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
+        self.parse(|p| {
+            match f(p) {
+                Some(_) => None,
+                None => Some(p.parsed(()))
+            }
+        })
+    }
+
+    // FIXME - this should eventually go away
     // Executes the given function.  If Some is returned, then the result is wrapped with the start and end character positions.  Otherwise, the position is reset to its starting point and None is returned
     fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
@@ -156,6 +215,7 @@ impl<'a> PegParser for PegParserImpl<'a> {
         }
     }
 
+    // FIXME - this should eventually go away
     // Executes the given function.  If Some is returned, then the result is wrapped with the start and end character positions.  Otherwise, the position is reset to its starting point and None is returned
     fn try_parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
