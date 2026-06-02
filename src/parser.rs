@@ -4,27 +4,26 @@
 use crate::ast;
 use crate::peg_parser::{PegParser, CharClass, Rule, Parsed, ParseError};
 
-// Combines the given first and rest into a single Vec with a range spanning both
-pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Parsed<Vec<Parsed<R>>> {
-    let range = first.range.union(&rest.range);
-    let value = std::iter::once(first).chain(rest.value.into_iter()).collect();
-    Parsed {range, value}
-}
-
-// Collect digit characters into a single u32 parsed with the given radix, ignoring underscores
-pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
-    digits.iter().fold(0, |acc, v| {
-        match v.value {
-            DigitOrUnderscore::Digit(d) => (acc * radix) + d.to_digit(radix).unwrap(),
-            _ => acc
-        }
-    })
-}
-
 pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
+
+    //--------------------------------------------------
+    // Ignorable space
 
     let ws_char: Rule<(),_> = p.add_rule(RuleName::WsChar, |p| Some(p.char_class(WS_CHARS)?.with_value(())))?;
     let ws: Rule<(),_> = p.add_rule(RuleName::Ws, |p| Some(p.plus(&ws_char)?.with_value(())))?;
+
+    let sp: Rule<(),_> = p.add_rule(RuleName::Sp, |p| {
+        if let Some(r) = p.rule(&ws) {Some(r)}
+        else {None}
+    })?;
+
+    let opt_sp: Rule<(),_> = p.add_rule(RuleName::OptSp, |p| {
+        if let Some(r) = p.opt(&sp) {Some(r.with_value(()))}
+        else {None}
+    })?;
+
+    //--------------------------------------------------
+    // Identifiers
 
     let identifier_start_char: Rule<char,_> = p.add_rule(RuleName::IdentifierStartChar, |p| {
         p.char_class(IDENTIFIER_START_CHARS)
@@ -140,6 +139,285 @@ pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
     })?;
 
     //--------------------------------------------------
+    // MultExpression
+
+    let mult_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::MultExpressionOp, |p| {
+        if let Some(r) = p.ch('*') {Some(r.with_value(ast::BinaryOp::Times))}
+        else if let Some(r) = p.ch('/') {Some(r.with_value(ast::BinaryOp::Divide))}
+        else if let Some(r) = p.ch('%') {Some(r.with_value(ast::BinaryOp::Mod))}
+        else {None}
+    })?;
+
+    let mult_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::MultExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&mult_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&int_literal)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let mult_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::MultExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&int_literal)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&mult_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // AddExpression
+
+    let add_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::AddExpressionOp, |p| {
+        if let Some(r) = p.ch('+') {Some(r.with_value(ast::BinaryOp::Plus))}
+        else if let Some(r) = p.ch('-') {Some(r.with_value(ast::BinaryOp::Minus))}
+        else {None}
+    })?;
+
+    let add_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::AddExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&add_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&mult_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let add_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::AddExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&mult_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&add_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // BitshiftExpression
+
+    let bitshift_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::BitshiftExpressionOp, |p| {
+        if let Some(r) = p.str("<=") {Some(r.with_value(ast::BinaryOp::LessThanOrEquals))}
+        else if let Some(r) = p.str("<") {Some(r.with_value(ast::BinaryOp::LessThan))}
+        else if let Some(r) = p.str(">=") {Some(r.with_value(ast::BinaryOp::GreaterThanOrEquals))}
+        else if let Some(r) = p.str(">") {Some(r.with_value(ast::BinaryOp::GreaterThan))}
+        else {None}
+    })?;
+
+    let bitshift_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::BitshiftExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&bitshift_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&add_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let bitshift_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::BitshiftExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&add_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&bitshift_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // RelationalExpression
+
+    let relational_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::RelationalExpressionOp, |p| {
+        if let Some(r) = p.str("<<") {Some(r.with_value(ast::BinaryOp::ShiftLeft))}
+        else if let Some(r) = p.str(">>>") {Some(r.with_value(ast::BinaryOp::LogicalShiftRight))}
+        else if let Some(r) = p.str(">>") {Some(r.with_value(ast::BinaryOp::ArithmeticShiftRight))}
+        else {None}
+    })?;
+
+    let relational_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::RelationalExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&relational_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&bitshift_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let relational_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::RelationalExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&bitshift_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&relational_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // EqualityExpression
+
+    let equality_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::EqualityExpressionOp, |p| {
+        if let Some(r) = p.str("==") {Some(r.with_value(ast::BinaryOp::Equals))}
+        else if let Some(r) = p.str("!=") {Some(r.with_value(ast::BinaryOp::NotEquals))}
+        else {None}
+    })?;
+
+    let equality_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::EqualityExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&equality_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&relational_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let equality_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::EqualityExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&relational_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&equality_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // BitwiseAndExpression
+
+    let bitwise_and_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::BitwiseAndExpressionOp, |p| {
+        if let Some(r) = p.str("&") {Some(r.with_value(ast::BinaryOp::BitwiseAnd))}
+        else {None}
+    })?;
+
+    let bitwise_and_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::BitwiseAndExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&bitwise_and_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&equality_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let bitwise_and_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::BitwiseAndExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&equality_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&bitwise_and_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // BitwiseXorExpression
+
+    let bitwise_xor_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::BitwiseXorExpressionOp, |p| {
+        if let Some(r) = p.str("^") {Some(r.with_value(ast::BinaryOp::BitwiseXor))}
+        else {None}
+    })?;
+
+    let bitwise_xor_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::BitwiseXorExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&bitwise_xor_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&bitwise_and_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let bitwise_xor_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::BitwiseXorExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&bitwise_and_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&bitwise_xor_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // BitwiseOrExpression
+
+    let bitwise_or_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::BitwiseOrExpressionOp, |p| {
+        if let Some(r) = p.str("|") {Some(r.with_value(ast::BinaryOp::BitwiseOr))}
+        else {None}
+    })?;
+
+    let bitwise_or_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::BitwiseOrExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&bitwise_or_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&bitwise_xor_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let bitwise_or_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::BitwiseOrExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&bitwise_xor_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&bitwise_or_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // LogicalAndExpression
+
+    let logical_and_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::LogicalAndExpressionOp, |p| {
+        if let Some(r) = p.str("&&") {Some(r.with_value(ast::BinaryOp::LogicalAnd))}
+        else {None}
+    })?;
+
+    let logical_and_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::LogicalAndExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&logical_and_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&bitwise_or_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let logical_and_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::LogicalAndExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&bitwise_or_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&logical_and_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
+    // LogicalOrExpression
+
+    let logical_or_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::LogicalOrExpressionOp, |p| {
+        if let Some(r) = p.str("&&") {Some(r.with_value(ast::BinaryOp::LogicalOr))}
+        else {None}
+    })?;
+
+    let logical_or_expression_term: Rule<ast::BinaryExpressionTerm,_> = p.add_rule(RuleName::LogicalOrExpressionTerm, |p| {
+        p.to_parsed(|p| {
+            let _ = p.rule(&opt_sp)?;
+            let op = p.rule(&logical_or_expression_op)?;
+            let _ = p.rule(&opt_sp)?;
+            let exp = p.rule(&logical_and_expression)?;
+            Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
+        })
+    })?;
+
+    let logical_or_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::LogicalOrExpression, |p| {
+        p.to_parsed(|p| {
+            let first = p.rule(&logical_and_expression)?;
+            let _ = p.rule(&opt_sp)?;
+            let rest = p.star(&logical_or_expression_term)?.value;
+            Some(ast::Expression::binary_expression(first, rest))
+        })
+    })?;
+
+    //--------------------------------------------------
     // Expressions
 
     let expression: Rule<ast::Expression,_> = p.add_rule(RuleName::Expression, |p| {
@@ -149,7 +427,8 @@ pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
     })?;
 
     // Main parse target
-    if let Some(r) = p.rule(&expression) {
+//    if let Some(r) = p.rule(&expression) {
+    if let Some(r) = p.rule(&logical_or_expression) {
         Ok(r)
     }
     else {
@@ -162,6 +441,8 @@ pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
 pub enum RuleName {
     WsChar,
     Ws,
+    Sp,
+    OptSp,
     IdentifierStartChar,
     IdentifierRestChar,
     Identifier,
@@ -184,6 +465,37 @@ pub enum RuleName {
     BinaryLiteral,
     IntLiteral,
     Expression,
+
+    AddExpressionOp,
+    AddExpression,
+    AddExpressionTerm,
+    MultExpressionOp,
+    MultExpression,
+    MultExpressionTerm,
+    BitshiftExpressionOp,
+    BitshiftExpression,
+    BitshiftExpressionTerm,
+    RelationalExpressionOp,
+    RelationalExpression,
+    RelationalExpressionTerm,
+    EqualityExpressionOp,
+    EqualityExpression,
+    EqualityExpressionTerm,
+    BitwiseAndExpressionOp,
+    BitwiseAndExpression,
+    BitwiseAndExpressionTerm,
+    BitwiseXorExpressionOp,
+    BitwiseXorExpression,
+    BitwiseXorExpressionTerm,
+    BitwiseOrExpressionOp,
+    BitwiseOrExpression,
+    BitwiseOrExpressionTerm,
+    LogicalAndExpressionOp,
+    LogicalAndExpression,
+    LogicalAndExpressionTerm,
+    LogicalOrExpressionOp,
+    LogicalOrExpression,
+    LogicalOrExpressionTerm,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
@@ -205,4 +517,21 @@ const BINARY_DIGIT: CharClass = CharClass::new()
 pub enum DigitOrUnderscore {
     Digit(char),
     Underscore,
+}
+
+// Combines the given first and rest into a single Vec with a range spanning both
+pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Parsed<Vec<Parsed<R>>> {
+    let range = first.range.union(&rest.range);
+    let value = std::iter::once(first).chain(rest.value.into_iter()).collect();
+    Parsed {range, value}
+}
+
+// Collect digit characters into a single u32 parsed with the given radix, ignoring underscores
+pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
+    digits.iter().fold(0, |acc, v| {
+        match v.value {
+            DigitOrUnderscore::Digit(d) => (acc * radix) + d.to_digit(radix).unwrap(),
+            _ => acc
+        }
+    })
 }
