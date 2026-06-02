@@ -59,7 +59,7 @@ pub struct U32Literal {
 }
 
 // The source radix of an int literal
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Radix {
     Decimal,
     Hex,

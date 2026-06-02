@@ -187,16 +187,6 @@ pub struct ParsedRange {
     end: usize,
 }
 
-impl ParsedRange {
-    // Combine two ranges
-    pub fn union(&self, r: &ParsedRange) -> ParsedRange {
-        ParsedRange {
-            start: *[self.start, r.start].iter().min().unwrap(),
-            end: *[self.end, r.end].iter().max().unwrap(),
-        }
-    }
-}
-
 // Represents a set of characters and character ranges to be matched (or not matched if negated is true)
 pub struct CharClass {
     negated: bool,

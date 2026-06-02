@@ -37,25 +37,15 @@ impl Parser {
             else {None}
         })
     }
-
-    pub fn identifier_start_char(&self, p: &mut impl PegParser) -> Option<Parsed<char>> {
-        p.for_rule(RuleName::IdentifierStartChar, |p| {
-            p.char_class(&IDENTIFIER_START_CHARS)
-        })
-    }
-
-    pub fn identifier_rest_char(&self, p: &mut impl PegParser) -> Option<Parsed<char>> {
-        p.for_rule(RuleName::IdentifierRestChar, |p| {
-            p.char_class(&IDENTIFIER_REST_CHARS)
-        })
-    }
     
     pub fn identifier(&self, p: &mut impl PegParser) -> Option<Parsed<String>> {
         p.for_rule(RuleName::Identifier, |p| {
-            let first = self.identifier_start_char(p)?;
-            let rest = p.star(|p| self.identifier_rest_char(p))?;
-            // Collect the Vec<Parsed<char>> into a String
-            Some(first_and_rest(first, rest).map_value(|v| v.iter().map(|i| i.value).collect::<String>()))
+            p.to_parsed(|p| {
+                let first = p.char_class(&IDENTIFIER_START_CHARS)?;
+                let rest = p.star(|p| p.char_class(&IDENTIFIER_REST_CHARS))?;
+                // Collect the Vec<Parsed<char>> into a String
+                Some(first_and_rest(first, rest).iter().map(|i| i.value).collect::<String>())
+            })
         })
     }
 
@@ -67,136 +57,55 @@ impl Parser {
             else {None}
         })
     }
-
-    pub fn underscore_digit(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::UnderscorDigit, |p| {
-            Some(p.ch('_')?.with_value(DigitOrUnderscore::Underscore))
-        })
-    }
     
-    pub fn decimal_digit(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::DecimalDigit, |p| {
-            Some(p.char_class(&DECIMAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+    fn int_literal_radix(&self, p: &mut impl PegParser, prefix: &'static str, char_class: &CharClass, radix: u32, ast_radix: ast::Radix) -> Option<Parsed<ast::Expression>>
+    {
+        p.to_parsed(|p| {
+            let _ = p.str(prefix)?;
+            let first = p.char_class(char_class)?.map_value(|v| DigitOrUnderscore::Digit(*v));
+            let rest = p.star(|p| {
+                if let Some(r) = p.ch('_') {
+                    Some(r.with_value(DigitOrUnderscore::Underscore))
+                }
+                else {
+                    Some(p.char_class(char_class)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+                }
+            })?;
+            Some(ast::Expression::u32_literal(collect_digits(&first_and_rest(first, rest), radix), ast_radix))
         })
     }
 
-    pub fn decimal_digit_or_underscore(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::DecimalDigitOrUnderscore, |p| {
-            if let Some(r) = self.underscore_digit(p) {Some(r)}
-            else {self.decimal_digit(p)}
+    pub fn decimal_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::DecimalLiteral, |p| {
+            self.int_literal_radix(p, "", &DECIMAL_DIGIT, 10, ast::Radix::Decimal)
         })
     }
 
-    pub fn decimal_digits(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
-        p.for_rule(RuleName::DecimalDigits, |p| {
-            let first = self.decimal_digit(p)?;
-            let rest = p.star(|p| self.decimal_digit_or_underscore(p))?;
-            Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 10)))
-        })
-    }
-
-    
-    pub fn hex_digit(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::HexDigit, |p| {
-            Some(p.char_class(&HEX_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
-        })
-    }
-
-    pub fn hex_digit_or_underscore(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::HexDigitOrUnderscore, |p| {
-            if let Some(r) = self.underscore_digit(p) {Some(r)}
-            else {self.hex_digit(p)}
-        })
-    }
-
-    pub fn hex_digits(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
-        p.for_rule(RuleName::HexDigits, |p| {
-            let first = self.hex_digit(p)?;
-            let rest = p.star(|p| self.hex_digit_or_underscore(p))?;
-            Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 16)))
-        })
-    }
-
-    pub fn hex_literal(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
+    pub fn hex_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::HexLiteral, |p| {
-            let _ = p.str("0x")?;
-            Some(self.hex_digits(p)?)
+            self.int_literal_radix(p, "0x", &HEX_DIGIT, 16, ast::Radix::Hex)
         })
     }
     
-    pub fn octal_digit(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::OctalDigit, |p| {
-            Some(p.char_class(&OCTAL_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
-        })
-    }
-
-    pub fn octal_digit_or_underscore(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::OctalDigitOrUnderscore, |p| {
-            if let Some(r) = self.underscore_digit(p) {Some(r)}
-            else {self.octal_digit(p)}
-        })
-    }
-
-    pub fn octal_digits(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
-        p.for_rule(RuleName::OctalDigits, |p| {
-            let first = self.octal_digit(p)?;
-            let rest = p.star(|p| self.octal_digit_or_underscore(p))?;
-            Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 8)))
-        })
-    }
-
-    pub fn octal_literal(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
+    pub fn octal_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::OctalLiteral, |p| {
-            let _ = p.str("0o")?;
-            Some(self.octal_digits(p)?)
-        })
-    }
-    
-    pub fn binary_digit(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::BinaryDigit, |p| {
-            Some(p.char_class(&BINARY_DIGIT)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
+            self.int_literal_radix(p, "0o", &OCTAL_DIGIT, 8, ast::Radix::Octal)
         })
     }
 
-    pub fn binary_digit_or_underscore(&self, p: &mut impl PegParser) -> Option<Parsed<DigitOrUnderscore>> {
-        p.for_rule(RuleName::BinaryDigitOrUnderscore, |p| {
-            if let Some(r) = self.underscore_digit(p) {Some(r)}
-            else {self.binary_digit(p)}
-        })
-    }
-
-    pub fn binary_digits(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
-        p.for_rule(RuleName::BinaryDigits, |p| {
-            let first = self.binary_digit(p)?;
-            let rest = p.star(|p| self.binary_digit_or_underscore(p))?;
-            Some(first_and_rest(first, rest).map_value(|v| collect_digits(v, 2)))
-        })
-    }
-
-    pub fn binary_literal(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
+    pub fn binary_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BinaryLiteral, |p| {
-            let _ = p.str("0b")?;
-            Some(self.binary_digits(p)?)
+            self.int_literal_radix(p, "0b", &BINARY_DIGIT, 2, ast::Radix::Binary)
         })
     }
 
     pub fn int_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::IntLiteral, |p| {
-            if let Some(r) = self.hex_literal(p) {
-                Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Hex)))
-            }
-            else if let Some(r) = self.octal_literal(p) {
-                Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Octal)))
-            }
-            else if let Some(r) = self.binary_literal(p) {
-                Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Binary)))
-            }
-            else if let Some(r) = self.decimal_digits(p) {
-                Some(r.map_value(|v| ast::Expression::u32_literal(*v, ast::Radix::Decimal)))
-            }
-            else {
-                None
-            }
+            if let Some(r) = self.hex_literal(p) {Some(r)}
+            else if let Some(r) = self.octal_literal(p) {Some(r)}
+            else if let Some(r) = self.binary_literal(p) {Some(r)}
+            else if let Some(r) = self.decimal_literal(p) {Some(r)}
+            else {None}
         })
     }
 
@@ -342,28 +251,13 @@ pub enum RuleName {
     Ws,
     Sp,
     OptSp,
-    IdentifierStartChar,
-    IdentifierRestChar,
     Identifier,
     BooleanLiteral,
-    UnderscorDigit,
-    DecimalDigit,
-    DecimalDigitOrUnderscore,
-    DecimalDigits,
-    HexDigit,
-    HexDigitOrUnderscore,
-    HexDigits,
+    DecimalLiteral,
     HexLiteral,
-    OctalDigit,
-    OctalDigitOrUnderscore,
-    OctalDigits,
     OctalLiteral,
-    BinaryDigit,
-    BinaryDigitOrUnderscore,
-    BinaryDigits,
     BinaryLiteral,
     IntLiteral,
-    Expression,
 
     AddExpression,
     MultExpression,
@@ -400,10 +294,8 @@ pub enum DigitOrUnderscore {
 }
 
 // Combines the given first and rest into a single Vec with a range spanning both
-pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Parsed<Vec<Parsed<R>>> {
-    let range = first.range.union(&rest.range);
-    let value = std::iter::once(first).chain(rest.value.into_iter()).collect();
-    Parsed {range, value}
+pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Vec<Parsed<R>> {
+    std::iter::once(first).chain(rest.value.into_iter()).collect()
 }
 
 // Collect digit characters into a single u32 parsed with the given radix, ignoring underscores
