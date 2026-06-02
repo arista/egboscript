@@ -3,6 +3,7 @@ use crate::peg_parser::Parsed;
 #[derive(Debug)]
 pub enum Expression {
     BinaryExpression(BinaryExpression),
+    UnaryExpression(UnaryExpression),
     BooleanLiteral(bool),
     U32Literal(U32Literal),
 }
@@ -21,6 +22,16 @@ impl Expression {
             })
         }
     }
+
+    pub fn unary_expression(ops: Vec<Parsed<UnaryOp>>, exp: Parsed<Expression>, ) -> Self {
+        if ops.is_empty() {exp.value}
+        else {
+            Self::UnaryExpression(UnaryExpression {
+                ops,
+                exp: Box::new(exp),
+            })
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -33,6 +44,12 @@ pub struct BinaryExpression {
 pub struct BinaryExpressionTerm {
     pub op: Parsed<BinaryOp>,
     pub exp: Box<Parsed<Expression>>,
+}
+
+#[derive(Debug)]
+pub struct UnaryExpression {
+    pub ops: Vec<Parsed<UnaryOp>>,
+    pub exp: Box<Parsed<Expression>>
 }
 
 #[derive(Debug)]
@@ -71,4 +88,12 @@ pub enum BinaryOp {
     BitwiseOr,
     LogicalAnd,
     LogicalOr,
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    Plus,
+    Minus,
+    LogicalNot,
+    BitwiseNot,
 }

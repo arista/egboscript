@@ -139,6 +139,30 @@ pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
     })?;
 
     //--------------------------------------------------
+    // UnaryExpression
+
+    let unary_expression_op: Rule<ast::UnaryOp,_> = p.add_rule(RuleName::UnaryExpressionOp, |p| {
+        if let Some(r) = p.ch('+') {Some(r.with_value(ast::UnaryOp::Plus))}
+        else if let Some(r) = p.ch('-') {Some(r.with_value(ast::UnaryOp::Minus))}
+        else if let Some(r) = p.ch('!') {Some(r.with_value(ast::UnaryOp::LogicalNot))}
+        else if let Some(r) = p.ch('~') {Some(r.with_value(ast::UnaryOp::BitwiseNot))}
+        else {None}
+    })?;
+
+    let unary_expression_term: Rule<ast::UnaryOp,_> = p.add_rule(RuleName::UnaryExpressionTerm, |p| {
+        let _ = p.rule(&opt_sp)?;
+        p.rule(&unary_expression_op)
+    })?;
+
+    let unary_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::UnaryExpression, |p| {
+        p.to_parsed(|p| {
+            let ops = p.star(&unary_expression_term)?;
+            let exp = p.rule(&int_literal)?;
+            Some(ast::Expression::unary_expression(ops.value, exp))
+        })
+    })?;
+
+    //--------------------------------------------------
     // MultExpression
 
     let mult_expression_op: Rule<ast::BinaryOp,_> = p.add_rule(RuleName::MultExpressionOp, |p| {
@@ -153,14 +177,14 @@ pub fn parse(p: &mut PegParser) -> Result<Parsed<ast::Expression>, ParseError> {
             let _ = p.rule(&opt_sp)?;
             let op = p.rule(&mult_expression_op)?;
             let _ = p.rule(&opt_sp)?;
-            let exp = p.rule(&int_literal)?;
+            let exp = p.rule(&unary_expression)?;
             Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
         })
     })?;
 
     let mult_expression: Rule<ast::Expression,_> = p.add_rule(RuleName::MultExpression, |p| {
         p.to_parsed(|p| {
-            let first = p.rule(&int_literal)?;
+            let first = p.rule(&unary_expression)?;
             let _ = p.rule(&opt_sp)?;
             let rest = p.star(&mult_expression_term)?.value;
             Some(ast::Expression::binary_expression(first, rest))
@@ -496,6 +520,10 @@ pub enum RuleName {
     LogicalOrExpressionOp,
     LogicalOrExpression,
     LogicalOrExpressionTerm,
+
+    UnaryExpressionOp,
+    UnaryExpression,
+    UnaryExpressionTerm,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
