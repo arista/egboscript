@@ -6,6 +6,8 @@ pub enum Expression {
     UnaryExpression(UnaryExpression),
     BooleanLiteral(bool),
     U32Literal(U32Literal),
+    MemberExpression(MemberExpression),
+    IdentifierExpression(IdentifierExpression),
 }
 
 impl Expression {
@@ -23,7 +25,7 @@ impl Expression {
         }
     }
 
-    pub fn unary_expression(ops: Vec<Parsed<UnaryOp>>, exp: Parsed<Expression>, ) -> Self {
+    pub fn unary_expression(ops: Vec<Parsed<UnaryOp>>, exp: Parsed<Expression>) -> Self {
         if ops.is_empty() {exp.value}
         else {
             Self::UnaryExpression(UnaryExpression {
@@ -31,6 +33,20 @@ impl Expression {
                 exp: Box::new(exp),
             })
         }
+    }
+
+    pub fn member_expression(first: Parsed<Expression>, rest: Vec<Parsed<MemberOp>>) -> Self {
+        if rest.is_empty() {first.value}
+        else {
+            Self::MemberExpression(MemberExpression{
+                first: Box::new(first),
+                rest
+            })
+        }
+    }
+
+    pub fn identifier_expression(name: String) -> Self {
+        Self::IdentifierExpression(IdentifierExpression {name})
     }
 }
 
@@ -96,4 +112,56 @@ pub enum UnaryOp {
     Minus,
     LogicalNot,
     BitwiseNot,
+}
+
+#[derive(Debug)]
+pub enum MemberOp {
+    DotAccess(DotAccess),
+    FunctionCall(FunctionCall),
+    IndexAccess(IndexAccess),
+    NonNullAssert,
+}
+
+#[derive(Debug)]
+pub struct MemberExpression {
+    pub first: Box<Parsed<Expression>>,
+    pub rest: Vec<Parsed<MemberOp>>,
+}
+
+impl MemberOp {
+    pub fn dot_access(name: Parsed<String>) -> Self {
+        MemberOp::DotAccess(DotAccess{name})
+    }
+
+    pub fn function_call(args: Parsed<Vec<Parsed<Expression>>>) -> Self {
+        MemberOp::FunctionCall(FunctionCall{args})
+    }
+
+    pub fn index_access(exp: Parsed<Expression>) -> Self {
+        MemberOp::IndexAccess(IndexAccess{exp: Box::new(exp)})
+    }
+
+    pub fn non_null_assert() -> Self {
+        MemberOp::NonNullAssert
+    }
+}
+
+#[derive(Debug)]
+pub struct DotAccess {
+    pub name: Parsed<String>,
+}
+
+#[derive(Debug)]
+pub struct FunctionCall {
+    pub args: Parsed<Vec<Parsed<Expression>>>
+}
+
+#[derive(Debug)]
+pub struct IndexAccess {
+    pub exp: Box<Parsed<Expression>>,
+}
+
+#[derive(Debug)]
+pub struct IdentifierExpression {
+    pub name: String,
 }

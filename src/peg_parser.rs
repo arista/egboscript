@@ -36,6 +36,10 @@ pub trait PegParser {
     fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
         F: Fn(&mut Self)->Option<R>;
+
+    fn try_parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
 }
 
 impl<'a> PegParserImpl<'a> {
@@ -145,6 +149,20 @@ impl<'a> PegParser for PegParserImpl<'a> {
         let start = self.pos;
         if let Some(value) = f(self) {
             Some(Parsed {range: ParsedRange {start, end: self.pos}, value})
+        }
+        else {
+            self.pos = start;
+            None
+        }
+    }
+
+    // Executes the given function.  If Some is returned, then the result is wrapped with the start and end character positions.  Otherwise, the position is reset to its starting point and None is returned
+    fn try_parse<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
+        let start = self.pos;
+        if let Some(value) = f(self) {
+            Some(value)
         }
         else {
             self.pos = start;

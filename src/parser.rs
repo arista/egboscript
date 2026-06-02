@@ -109,6 +109,147 @@ impl Parser {
         })
     }
 
+    pub fn expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        self.unary_expression(p)
+    }
+
+    pub fn ternary_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        // FIXME - implement this correctly
+        self.expression(p)
+    }
+
+    pub fn member_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::MemberExpression, |p| {
+            p.to_parsed(|p| {
+                let first = self.grouping_expression(p)?;
+                let rest = p.star(|p| {
+                    if let Some(r) = self.dot_access(p) {Some(r)}
+                    else if let Some(r) = self.function_call(p) {Some(r)}
+                    else if let Some(r) = self.index_access(p) {Some(r)}
+                    else if let Some(r) = self.non_null_assert(p) {Some(r)}
+                    else {None}
+                })?.value;
+                Some(ast::Expression::member_expression(first, rest))
+            })
+        })
+    }
+
+    pub fn grouping_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::GroupingExpression, |p| {
+            if let Some(r) = p.try_parse(|p| {
+                let _ = p.str("(")?;
+                let _ = self.opt_sp(p)?;
+                let exp = self.expression(p)?;
+                let _ = self.opt_sp(p)?;
+                let _ = p.str(")")?;
+                Some(exp)
+            }) {Some(r)}
+            else if let Some(r) = self.primary_expression(p) {Some(r)}
+            else {None}
+        })
+    }
+
+    pub fn primary_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::IdentifierExpression, |p| {
+            if let Some(r) = self.literal_expression(p) {Some(r)}
+            else if let Some(r) = self.identifier_expression(p) {Some(r)}
+            else {None}
+        })
+    }
+
+    pub fn identifier_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::PrimaryExpression, |p| {
+            let Parsed {range, value} = self.identifier(p)?;
+            Some(Parsed {range, value: ast::Expression::identifier_expression(value)})
+        })
+    }
+
+    pub fn literal_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::LiteralExpression, |p| {
+            if let Some(r) = self.int_literal(p) {Some(r)}
+            else if let Some(r) = self.boolean_literal(p) {Some(r)}
+            // FIXME - add null literal
+            // FIXME - add string literal
+            else {None}
+        })
+    }
+
+    pub fn dot_access(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
+        p.for_rule(RuleName::DotAccess, |p| {
+            p.to_parsed(|p| {
+                let _ = self.opt_sp(p)?;
+                let _ = p.str(".")?;
+                let _ = self.opt_sp(p)?;
+                let name = self.identifier(p)?;
+                Some(ast::MemberOp::dot_access(name))
+            })
+        })
+    }
+
+    pub fn function_call(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
+        p.for_rule(RuleName::DotAccess, |p| {
+            p.to_parsed(|p| {
+                let _ = self.opt_sp(p)?;
+                let _ = p.str("(")?;
+                let _ = self.opt_sp(p)?;
+                let args = self.expression_list(p)?;
+                let _ = p.str(")")?;
+                Some(ast::MemberOp::function_call(args))
+            })
+        })
+    }
+
+    // Parses a comma-separated list of expressions.  Note that the individual elements are ternary expressions rather than full expressions, since full expressions include comma expressions, which would "swallow" all of the list into a single expression
+    fn expression_list(&self, p: &mut impl PegParser) -> Option<Parsed<Vec<Parsed<ast::Expression>>>> {
+        p.to_parsed(|p| {
+            let _ = self.opt_sp(p)?;
+            if let Some(first) = self.ternary_expression(p) {
+                let rest = p.star(|p| {
+                    let _ = self.opt_sp(p)?;
+                    let _ = p.str(",")?;
+                    let _ = self.opt_sp(p)?;
+                    let exp = self.ternary_expression(p)?;
+                    Some(exp)
+                })?;
+                // Allow trailing comma
+                let _ = self.opt_sp(p)?;
+                let _ = p.opt(|p| p.str(","))?;
+                
+                Some(first_and_rest(first, rest))
+            }
+            else {
+                Some(Vec::new())
+            }
+        })
+    }
+
+    pub fn index_access(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
+        p.for_rule(RuleName::IndexAccess, |p| {
+            p.to_parsed(|p| {
+                let _ = self.opt_sp(p)?;
+                let _ = p.str("[")?;
+                let _ = self.opt_sp(p)?;
+                let exp = self.expression(p)?;
+                let _ = self.opt_sp(p)?;
+                let _ = p.str("]")?;
+                let _ = self.opt_sp(p)?;
+                Some(ast::MemberOp::index_access(exp))
+            })
+        })
+    }
+
+    pub fn non_null_assert(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
+        p.for_rule(RuleName::NonNullAssert, |p| {
+            p.to_parsed(|p| {
+                let _ = self.opt_sp(p)?;
+                let _ = p.str("!")?;
+
+                // FIXME - make sure not followed by "="
+                Some(ast::MemberOp::non_null_assert())
+            })
+        })
+    }
+
     pub fn unary_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::UnaryExpression, |p| {
             p.to_parsed(|p| {
@@ -121,7 +262,7 @@ impl Parser {
                         ("~", ast::UnaryOp::BitwiseNot),
                     ])
                 })?;
-                let exp = self.int_literal(p)?;
+                let exp = self.member_expression(p)?;
                 Some(ast::Expression::unary_expression(ops.value, exp))
             })
         })
@@ -270,6 +411,16 @@ pub enum RuleName {
     LogicalAndExpression,
     LogicalOrExpression,
     UnaryExpression,
+    MemberExpression,
+    DotAccess,
+    FunctionCall,
+    FunctionCallArgs,
+    IndexAccess,
+    NonNullAssert,
+    GroupingExpression,
+    PrimaryExpression,
+    IdentifierExpression,
+    LiteralExpression,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
