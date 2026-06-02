@@ -61,6 +61,7 @@ impl Parser {
 
     pub fn boolean_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BooleanLiteral, |p| {
+            // FIXME - make sure these are followed by a WordBoundary
             if let Some(r) = p.str("true") {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
             else if let Some(r) = p.str("false") {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
             else {None}
@@ -199,339 +200,138 @@ impl Parser {
         })
     }
 
-    pub fn unary_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::UnaryOp>> {
-        p.for_rule(RuleName::UnaryExpressionOp, |p| {
-            if let Some(r) = p.ch('+') {Some(r.with_value(ast::UnaryOp::Plus))}
-            else if let Some(r) = p.ch('-') {Some(r.with_value(ast::UnaryOp::Minus))}
-            else if let Some(r) = p.ch('!') {Some(r.with_value(ast::UnaryOp::LogicalNot))}
-            else if let Some(r) = p.ch('~') {Some(r.with_value(ast::UnaryOp::BitwiseNot))}
-            else {None}
-        })
-    }
-
-    pub fn unary_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::UnaryOp>> {
-        p.for_rule(RuleName::UnaryExpressionTerm, |p| {
-            let _ = self.opt_sp(p)?;
-            self.unary_expression_op(p)
-        })
-    }
-
     pub fn unary_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::UnaryExpression, |p| {
             p.to_parsed(|p| {
-                let ops = p.star(|p| self.unary_expression_term(p))?;
+                let ops = p.star(|p| {
+                    let _ = self.opt_sp(p)?;
+                    self.op_str(p, &[
+                        ("+", ast::UnaryOp::Plus),
+                        ("-", ast::UnaryOp::Minus),
+                        ("!", ast::UnaryOp::LogicalNot),
+                        ("~", ast::UnaryOp::BitwiseNot),
+                    ])
+                })?;
                 let exp = self.int_literal(p)?;
                 Some(ast::Expression::unary_expression(ops.value, exp))
             })
         })
     }
 
-    pub fn mult_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::MultExpressionOp, |p| {
-            if let Some(r) = p.ch('*') {Some(r.with_value(ast::BinaryOp::Times))}
-            else if let Some(r) = p.ch('/') {Some(r.with_value(ast::BinaryOp::Divide))}
-            else if let Some(r) = p.ch('%') {Some(r.with_value(ast::BinaryOp::Mod))}
-            else {None}
-        })
+    fn op_str<R>(&self, p: &mut impl PegParser, op_strs: &[(&'static str, R)]) -> Option<Parsed<R>>
+        where R:Copy
+    {
+        for (s, r) in op_strs {
+            if let Some(s) = p.str(s) {return Some(s.with_value(*r))}
+        }
+        None
     }
 
-    pub fn mult_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::MultExpressionTerm, |p| {
-            p.to_parsed(|p| {
+    fn binary_expression<SF, PP>(&self, p: &mut PP, subexp: SF, op_strs: &[(&'static str, ast::BinaryOp)]) -> Option<Parsed<ast::Expression>>
+    where
+        PP: PegParser,
+        SF: Fn(&mut PP)->Option<Parsed<ast::Expression>>
+    {
+        p.to_parsed(|p| {
+            let first = subexp(p)?;
+            let _ = self.opt_sp(p)?;
+            let rest = p.star(|p| p.to_parsed(|p| {
                 let _ = self.opt_sp(p)?;
-                let op = self.mult_expression_op(p)?;
+                let op = self.op_str(p, op_strs)?;
                 let _ = self.opt_sp(p)?;
-                let exp = self.unary_expression(p)?;
+                let exp = subexp(p)?;
                 Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            }))?.value;
+            Some(ast::Expression::binary_expression(first, rest))
         })
     }
 
     pub fn mult_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::MultExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.unary_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.mult_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn add_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::AddExpressionOp, |p| {
-            if let Some(r) = p.ch('+') {Some(r.with_value(ast::BinaryOp::Plus))}
-            else if let Some(r) = p.ch('-') {Some(r.with_value(ast::BinaryOp::Minus))}
-            else {None}
-        })
-    }
-
-    pub fn add_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::AddExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.add_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.mult_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.unary_expression(p), &[
+                ("*", ast::BinaryOp::Times),
+                ("/", ast::BinaryOp::Divide),
+                ("%", ast::BinaryOp::Mod)
+            ])
         })
     }
 
     pub fn add_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::AddExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.mult_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.add_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn bitshift_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::BitshiftExpressionOp, |p| {
-            if let Some(r) = p.str("<=") {Some(r.with_value(ast::BinaryOp::LessThanOrEquals))}
-            else if let Some(r) = p.str("<") {Some(r.with_value(ast::BinaryOp::LessThan))}
-            else if let Some(r) = p.str(">=") {Some(r.with_value(ast::BinaryOp::GreaterThanOrEquals))}
-            else if let Some(r) = p.str(">") {Some(r.with_value(ast::BinaryOp::GreaterThan))}
-            else {None}
-        })
-    }
-
-    pub fn bitshift_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::BitshiftExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.bitshift_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.add_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.mult_expression(p), &[
+                ("+", ast::BinaryOp::Plus),
+                ("-", ast::BinaryOp::Minus),
+            ])
         })
     }
 
     pub fn bitshift_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BitshiftExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.add_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.bitshift_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn relational_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::RelationalExpressionOp, |p| {
-            if let Some(r) = p.str("<<") {Some(r.with_value(ast::BinaryOp::ShiftLeft))}
-            else if let Some(r) = p.str(">>>") {Some(r.with_value(ast::BinaryOp::LogicalShiftRight))}
-            else if let Some(r) = p.str(">>") {Some(r.with_value(ast::BinaryOp::ArithmeticShiftRight))}
-            else {None}
-        })
-    }
-
-    pub fn relational_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::RelationalExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.relational_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.bitshift_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.add_expression(p), &[
+                ("<<", ast::BinaryOp::ShiftLeft),
+                (">>>", ast::BinaryOp::LogicalShiftRight),
+                (">>", ast::BinaryOp::ArithmeticShiftRight),
+            ])
         })
     }
 
     pub fn relational_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::RelationalExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.bitshift_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.relational_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn equality_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::EqualityExpressionOp, |p| {
-            if let Some(r) = p.str("==") {Some(r.with_value(ast::BinaryOp::Equals))}
-            else if let Some(r) = p.str("!=") {Some(r.with_value(ast::BinaryOp::NotEquals))}
-            else {None}
-        })
-    }
-
-    pub fn equality_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::EqualityExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.equality_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.relational_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.bitshift_expression(p), &[
+                ("<=", ast::BinaryOp::LessThanOrEquals),
+                ("<", ast::BinaryOp::LessThan),
+                (">=", ast::BinaryOp::GreaterThanOrEquals),
+                (">", ast::BinaryOp::GreaterThan),
+            ])
         })
     }
 
     pub fn equality_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::EqualityExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.relational_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.equality_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn bitwise_and_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::BitwiseAndExpressionOp, |p| {
-            if let Some(r) = p.str("&") {Some(r.with_value(ast::BinaryOp::BitwiseAnd))}
-            else {None}
-        })
-    }
-
-    pub fn bitwise_and_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::BitwiseAndExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.bitwise_and_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.equality_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.relational_expression(p), &[
+                ("==", ast::BinaryOp::Equals),
+                ("!=", ast::BinaryOp::NotEquals),
+            ])
         })
     }
 
     pub fn bitwise_and_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BitwiseAndExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.equality_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.bitwise_and_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn bitwise_xor_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::BitwiseXorExpressionOp, |p| {
-            if let Some(r) = p.str("^") {Some(r.with_value(ast::BinaryOp::BitwiseXor))}
-            else {None}
-        })
-    }
-
-    pub fn bitwise_xor_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::BitwiseXorExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.bitwise_xor_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.bitwise_and_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.equality_expression(p), &[
+                ("&", ast::BinaryOp::BitwiseAnd),
+            ])
         })
     }
 
     pub fn bitwise_xor_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BitwiseXorExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.bitwise_and_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.bitwise_xor_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn bitwise_or_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::BitwiseOrExpressionOp, |p| {
-            if let Some(r) = p.str("|") {Some(r.with_value(ast::BinaryOp::BitwiseOr))}
-            else {None}
-        })
-    }
-
-    pub fn bitwise_or_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::BitwiseOrExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.bitwise_or_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.bitwise_xor_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.bitwise_and_expression(p), &[
+                ("^", ast::BinaryOp::BitwiseXor),
+            ])
         })
     }
 
     pub fn bitwise_or_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BitwiseOrExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.bitwise_xor_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.bitwise_or_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn logical_and_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::LogicalAndExpressionOp, |p| {
-            if let Some(r) = p.str("&&") {Some(r.with_value(ast::BinaryOp::LogicalAnd))}
-            else {None}
-        })
-    }
-
-    pub fn logical_and_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::LogicalAndExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.logical_and_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.bitwise_or_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.bitwise_xor_expression(p), &[
+                ("|", ast::BinaryOp::BitwiseOr),
+            ])
         })
     }
 
     pub fn logical_and_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::LogicalAndExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.bitwise_or_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.logical_and_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
-        })
-    }
-
-    pub fn logical_or_expression_op(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryOp>> {
-        p.for_rule(RuleName::LogicalOrExpressionOp, |p| {
-            if let Some(r) = p.str("&&") {Some(r.with_value(ast::BinaryOp::LogicalOr))}
-            else {None}
-        })
-    }
-
-    pub fn logical_or_expression_term(&self, p: &mut impl PegParser) -> Option<Parsed<ast::BinaryExpressionTerm>> {
-        p.for_rule(RuleName::LogicalOrExpressionTerm, |p| {
-            p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
-                let op = self.logical_or_expression_op(p)?;
-                let _ = self.opt_sp(p)?;
-                let exp = self.logical_and_expression(p)?;
-                Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
-            })
+            self.binary_expression(p, |p| self.bitwise_or_expression(p), &[
+                ("&&", ast::BinaryOp::LogicalAnd),
+            ])
         })
     }
 
     pub fn logical_or_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::LogicalOrExpression, |p| {
-            p.to_parsed(|p| {
-                let first = self.logical_and_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let rest = p.star(|p| self.logical_or_expression_term(p))?.value;
-                Some(ast::Expression::binary_expression(first, rest))
-            })
+            self.binary_expression(p, |p| self.logical_and_expression(p), &[
+                ("||", ast::BinaryOp::LogicalOr),
+            ])
         })
     }
 }
@@ -565,40 +365,17 @@ pub enum RuleName {
     IntLiteral,
     Expression,
 
-    AddExpressionOp,
     AddExpression,
-    AddExpressionTerm,
-    MultExpressionOp,
     MultExpression,
-    MultExpressionTerm,
-    BitshiftExpressionOp,
     BitshiftExpression,
-    BitshiftExpressionTerm,
-    RelationalExpressionOp,
     RelationalExpression,
-    RelationalExpressionTerm,
-    EqualityExpressionOp,
     EqualityExpression,
-    EqualityExpressionTerm,
-    BitwiseAndExpressionOp,
     BitwiseAndExpression,
-    BitwiseAndExpressionTerm,
-    BitwiseXorExpressionOp,
     BitwiseXorExpression,
-    BitwiseXorExpressionTerm,
-    BitwiseOrExpressionOp,
     BitwiseOrExpression,
-    BitwiseOrExpressionTerm,
-    LogicalAndExpressionOp,
     LogicalAndExpression,
-    LogicalAndExpressionTerm,
-    LogicalOrExpressionOp,
     LogicalOrExpression,
-    LogicalOrExpressionTerm,
-
-    UnaryExpressionOp,
     UnaryExpression,
-    UnaryExpressionTerm,
 }
 
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);

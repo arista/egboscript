@@ -67,7 +67,7 @@ pub enum Radix {
     Binary,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     Plus,
     Minus,
@@ -90,7 +90,7 @@ pub enum BinaryOp {
     LogicalOr,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum UnaryOp {
     Plus,
     Minus,
