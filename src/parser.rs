@@ -367,22 +367,49 @@ impl Parser {
         p.for_rule(RuleName::LiteralExpression, |p| {
             if let Some(r) = self.boolean_literal(p) {Some(r)}
             else if let Some(r) = self.int_literal(p) {Some(r)}
-            // FIXME - add null literal
+            else if let Some(r) = self.null_literal(p) {Some(r)}
             // FIXME - add string literal
+            // FIXME - add string template
             else {None}
         })
     }
 
     pub fn boolean_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::BooleanLiteral, |p| {
-            // FIXME - make sure these are followed by a WordBoundary
-            if let Some(r) = p.str("true") {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
-            else if let Some(r) = p.str("false") {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
+            if let Some(r) = p.parse(|p| {
+                let value = p.str("true")?;
+                // Must be followed by a non-identifier char or eof
+                let _ = self.word_boundary(p)?;
+                Some(p.parsed(value))
+            }) {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
+            else if let Some(r) = p.parse(|p| {
+                let value = p.str("false")?;
+                // Must be followed by a non-identifier char or eof
+                let _ = self.word_boundary(p)?;
+                Some(p.parsed(value))
+            }) {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
             else {None}
         })
     }
 
+    pub fn null_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::NullLiteral, |p| {
+            if let Some(r) = p.parse(|p| {
+                let value = p.str("null")?;
+                // Must be followed by a non-identifier char or eof
+                let _ = self.word_boundary(p)?;
+                Some(p.parsed(value))
+            }) {Some(r.with_value(ast::Expression::null_literal()))}
+            else {None}
+        })
+    }
 
+    // Typically follows reserved words to make sure they aren't recognized too quickly if they're actually the start of a longer identifier (e.g., "false" vs. "falsey")
+    pub fn word_boundary(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::WordBoundary, |p| {
+            p.not(|p| p.char_class(&IDENTIFIER_REST_CHARS))
+        })
+    }
 
 
 
@@ -503,8 +530,10 @@ pub enum RuleName {
     Ws,
     Sp,
     OptSp,
+    WordBoundary,
     Identifier,
     BooleanLiteral,
+    NullLiteral,
     DecimalLiteral,
     HexLiteral,
     OctalLiteral,

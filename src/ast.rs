@@ -8,6 +8,7 @@ pub enum Expression {
     BinaryExpression(BinaryExpression),
     UnaryExpression(UnaryExpression),
     BooleanLiteral(bool),
+    NullLiteral,
     U32Literal(U32Literal),
     MemberExpression(MemberExpression),
     IdentifierExpression(IdentifierExpression),
@@ -23,6 +24,10 @@ impl Expression {
             terms,
             if_false: Box::new(if_false),
         })
+    }
+
+    pub fn null_literal() -> Self {
+        Self::NullLiteral
     }
 
     pub fn u32_literal(val: u32, radix: Radix) -> Self {
