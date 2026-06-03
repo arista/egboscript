@@ -593,12 +593,26 @@ impl Parser {
         })
     }
 
+    // shorthand for optional space
+    pub fn opt_sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::OptSp, |p| {
+            if let Some(r) = p.opt(|p| self.sp(p)) {Some(r.with_value(()))}
+            else {None}
+        })
+    }
 
+    pub fn sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::Sp, |p| {
+            if let Some(r) = p.star(|p| {
+                if let Some(r) = self.ws(p) {Some(r)}
+                else if let Some(r) = self.line_comment(p) {Some(r)}
+                else if let Some(r) = self.block_comment(p) {Some(r)}
+                else {None}
+            }) {Some(r.with_value(()))}
+            else {None}
+        })
+    }
 
-
-    
-    
-    
     pub fn ws_char(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
         p.for_rule(RuleName::WsChar, |p| {
             Some(p.char_class(&WS_CHARS)?.with_value(()))
@@ -611,19 +625,35 @@ impl Parser {
         })
     }
 
-    pub fn sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::Sp, |p| {
-            if let Some(r) = self.ws(p) {Some(r)}
-            else {None}
+    pub fn line_comment(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::LineComment, |p| {
+            p.parse(|p| {
+                p.str("//")?;
+                p.star(|p| {
+                    let value = p.char_class(&NOT_NEWLINE_CHARS)?;
+                    Some(p.parsed(value))
+                    //Some(p.char_class(&NOT_NEWLINE_CHARS)?)
+                })?;
+                Some(p.parsed(()))
+            })
         })
     }
 
-    pub fn opt_sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::OptSp, |p| {
-            if let Some(r) = p.opt(|p| self.sp(p)) {Some(r.with_value(()))}
-            else {None}
+    pub fn block_comment(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::BlockComment, |p| {
+            p.parse(|p| {
+                p.str("/*")?;
+                p.star(|p| {
+                    p.not(|p| p.str("*/"))?;
+                    p.char_class(&ANY_CHAR)?;
+                    Some(p.parsed(()))
+                })?;
+                p.str("*/")?;
+                Some(p.parsed(()))
+            })
         })
     }
+
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
@@ -637,6 +667,8 @@ pub enum RuleName {
     Ws,
     Sp,
     OptSp,
+    LineComment,
+    BlockComment,
     WordBoundary,
     Identifier,
     BooleanLiteral,
@@ -673,6 +705,7 @@ pub enum RuleName {
     LiteralExpression,
 }
 
+const ANY_CHAR: CharClass = CharClass::new().except();
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
 const IDENTIFIER_START_CHARS: CharClass = CharClass::new()
     .ranges(&[('A', 'Z'), ('a', 'z')])
@@ -689,6 +722,7 @@ const OCTAL_DIGIT: CharClass = CharClass::new()
 const BINARY_DIGIT: CharClass = CharClass::new()
     .ranges(&[('0', '1')]);
 const NEWLINE_CHARS: CharClass = CharClass::new().chars(&['\r', '\n']);
+const NOT_NEWLINE_CHARS: CharClass = NEWLINE_CHARS.except();
 
 pub enum DigitOrUnderscore {
     Digit(char),
