@@ -59,6 +59,15 @@ impl Parser {
         })
     }
 
+    fn op_str<R>(&self, p: &mut impl PegParser, op_strs: &[(&'static str, R)]) -> Option<Parsed<R>>
+        where R:Copy
+    {
+        for (s, r) in op_strs {
+            if let Some(s) = p.str(s) {return Some(s.with_value(*r))}
+        }
+        None
+    }
+
     pub fn assignment_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::AssignmentExpression, |p| {
             self.binary_expression(p, |p| self.ternary_expression(p), &[
@@ -533,38 +542,6 @@ impl Parser {
         None
     }
     
-
-
-
-
-    
-    
-    pub fn ws_char(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::WsChar, |p| {
-            Some(p.char_class(&WS_CHARS)?.with_value(()))
-        })
-    }
-
-    pub fn ws(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::Ws, |p| {
-            Some(p.char_class(&WS_CHARS)?.with_value(()))
-        })
-    }
-
-    pub fn sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::Sp, |p| {
-            if let Some(r) = self.ws(p) {Some(r)}
-            else {None}
-        })
-    }
-
-    pub fn opt_sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
-        p.for_rule(RuleName::OptSp, |p| {
-            if let Some(r) = p.opt(|p| self.sp(p)) {Some(r.with_value(()))}
-            else {None}
-        })
-    }
-    
     fn int_literal_radix(&self, p: &mut impl PegParser, prefix: &'static str, char_class: &CharClass, radix: u32, ast_radix: ast::Radix) -> Option<Parsed<ast::Expression>>
     {
         p.to_parsed(|p| {
@@ -617,13 +594,35 @@ impl Parser {
     }
 
 
-    fn op_str<R>(&self, p: &mut impl PegParser, op_strs: &[(&'static str, R)]) -> Option<Parsed<R>>
-        where R:Copy
-    {
-        for (s, r) in op_strs {
-            if let Some(s) = p.str(s) {return Some(s.with_value(*r))}
-        }
-        None
+
+
+    
+    
+    
+    pub fn ws_char(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::WsChar, |p| {
+            Some(p.char_class(&WS_CHARS)?.with_value(()))
+        })
+    }
+
+    pub fn ws(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::Ws, |p| {
+            Some(p.char_class(&WS_CHARS)?.with_value(()))
+        })
+    }
+
+    pub fn sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::Sp, |p| {
+            if let Some(r) = self.ws(p) {Some(r)}
+            else {None}
+        })
+    }
+
+    pub fn opt_sp(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::OptSp, |p| {
+            if let Some(r) = p.opt(|p| self.sp(p)) {Some(r.with_value(()))}
+            else {None}
+        })
     }
 }
 
