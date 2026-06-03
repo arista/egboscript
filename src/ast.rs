@@ -9,6 +9,7 @@ pub enum Expression {
     UnaryExpression(UnaryExpression),
     BooleanLiteral(bool),
     NullLiteral,
+    StringLiteral(String),
     U32Literal(U32Literal),
     MemberExpression(MemberExpression),
     IdentifierExpression(IdentifierExpression),
@@ -28,6 +29,10 @@ impl Expression {
 
     pub fn null_literal() -> Self {
         Self::NullLiteral
+    }
+
+    pub fn string_literal(str: String) -> Self {
+        Self::StringLiteral(str)
     }
 
     pub fn u32_literal(val: u32, radix: Radix) -> Self {

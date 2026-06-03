@@ -1,8 +1,8 @@
 // FIXME - to reduce noise during initial development
-#![allow(unused)]
+//#![allow(unused)]
 
 use crate::ast;
-use crate::peg_parser::{PegParser, CharClass, Parsed, ParseError};
+use crate::peg_parser::{PegParser, CharClass, Parsed};
 
 pub struct Parser {
 }
@@ -21,9 +21,9 @@ impl Parser {
             p.parse(|p| {
                 let first = self.assignment_expression(p)?;
                 let rest = p.star(|p| p.try_parse(|p| {
-                    let _ = self.opt_sp(p)?;
-                    let _ = p.str(",")?;
-                    let _ = self.opt_sp(p)?;
+                    self.opt_sp(p)?;
+                    p.str(",")?;
+                    self.opt_sp(p)?;
                     let exp = self.ternary_expression(p)?;
                     Some(exp)
                 }))?;
@@ -43,11 +43,11 @@ impl Parser {
     {
         p.parse(|p| {
             let first = subexp(p)?;
-            let _ = self.opt_sp(p)?;
+            self.opt_sp(p)?;
             let rest = p.star(|p| p.to_parsed(|p| {
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
                 let op = self.op_str(p, op_strs)?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
                 let exp = subexp(p)?;
                 Some(ast::BinaryExpressionTerm {op, exp: Box::new(exp)})
             }))?.value;
@@ -84,7 +84,7 @@ impl Parser {
         p.for_rule(RuleName::TernaryExpression, |p| {
             p.parse(|p| {
                 let terms = p.star(|p| self.ternary_expression_term(p))?.value;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
                 let if_false = self.logical_or_expression(p)?;
 
                 if terms.is_empty() {Some(if_false)}
@@ -100,13 +100,13 @@ impl Parser {
         p.for_rule(RuleName::TernaryExpressionTerm, |p| {
             p.parse(|p| {
                 let test = self.logical_or_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let _ = p.str("?")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str("?")?;
+                self.opt_sp(p)?;
                 let if_true = self.logical_or_expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let _ = p.str(":")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str(":")?;
+                self.opt_sp(p)?;
 
                 let value = ast::TernaryExpressionTerm {
                     test: Box::new(test),
@@ -210,7 +210,7 @@ impl Parser {
         p.for_rule(RuleName::UnaryExpression, |p| {
             p.parse(|p| {
                 let ops = p.star(|p| {
-                    let _ = self.opt_sp(p)?;
+                    self.opt_sp(p)?;
                     self.op_str(p, &[
                         ("+", ast::UnaryOp::Plus),
                         ("-", ast::UnaryOp::Minus),
@@ -218,7 +218,7 @@ impl Parser {
                         ("~", ast::UnaryOp::BitwiseNot),
                     ])
                 })?.value;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
                 let exp = self.member_expression(p)?;
 
                 if ops.is_empty() {Some(exp)}
@@ -253,9 +253,9 @@ impl Parser {
     pub fn dot_access(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
         p.for_rule(RuleName::DotAccess, |p| {
             p.parse(|p| {
-                let _ = self.opt_sp(p)?;
-                let _ = p.str(".")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str(".")?;
+                self.opt_sp(p)?;
                 let name = self.identifier(p)?;
                 Some(p.parsed(ast::MemberOp::dot_access(name)))
             })
@@ -265,11 +265,11 @@ impl Parser {
     pub fn function_call(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
         p.for_rule(RuleName::DotAccess, |p| {
             p.parse(|p| {
-                let _ = self.opt_sp(p)?;
-                let _ = p.str("(")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
                 let args = self.expression_list(p)?;
-                let _ = p.str(")")?;
+                p.str(")")?;
                 Some(p.parsed(ast::MemberOp::function_call(args)))
             })
         })
@@ -278,18 +278,18 @@ impl Parser {
     // Parses a comma-separated list of expressions.  Note that the individual elements are ternary expressions rather than full expressions, since full expressions include comma expressions, which would "swallow" all of the list into a single expression
     fn expression_list(&self, p: &mut impl PegParser) -> Option<Parsed<Vec<Parsed<ast::Expression>>>> {
         p.parse(|p| {
-            let _ = self.opt_sp(p)?;
+            self.opt_sp(p)?;
             if let Some(first) = self.ternary_expression(p) {
                 let rest = p.star(|p| {
-                    let _ = self.opt_sp(p)?;
-                    let _ = p.str(",")?;
-                    let _ = self.opt_sp(p)?;
+                    self.opt_sp(p)?;
+                    p.str(",")?;
+                    self.opt_sp(p)?;
                     let exp = self.ternary_expression(p)?;
                     Some(exp)
                 })?;
                 // Allow trailing comma
-                let _ = self.opt_sp(p)?;
-                let _ = p.opt(|p| p.str(","))?;
+                self.opt_sp(p)?;
+                p.opt(|p| p.str(","))?;
                 
                 Some(p.parsed(first_and_rest(first, rest)))
             }
@@ -302,13 +302,13 @@ impl Parser {
     pub fn index_access(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
         p.for_rule(RuleName::IndexAccess, |p| {
             p.parse(|p| {
-                let _ = self.opt_sp(p)?;
-                let _ = p.str("[")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str("[")?;
+                self.opt_sp(p)?;
                 let exp = self.expression(p)?;
-                let _ = self.opt_sp(p)?;
-                let _ = p.str("]")?;
-                let _ = self.opt_sp(p)?;
+                self.opt_sp(p)?;
+                p.str("]")?;
+                self.opt_sp(p)?;
                 Some(p.parsed(ast::MemberOp::index_access(exp)))
             })
         })
@@ -317,10 +317,10 @@ impl Parser {
     pub fn non_null_assert(&self, p: &mut impl PegParser) -> Option<Parsed<ast::MemberOp>> {
         p.for_rule(RuleName::NonNullAssert, |p| {
             p.parse(|p| {
-                let _ = self.opt_sp(p)?;
-                let _ = p.str("!")?;
+                self.opt_sp(p)?;
+                p.str("!")?;
                 // Make sure it's not followed by "=", to keep it from eating the "!" of a "!=" which is at a higher precedence level
-                let _ = p.not(|p| p.str("="))?;
+                p.not(|p| p.str("="))?;
                 Some(p.parsed(ast::MemberOp::non_null_assert()))
             })
         })
@@ -338,11 +338,11 @@ impl Parser {
     pub fn grouped_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::GroupedExpression, |p| {
             p.parse(|p| {
-                let _ = p.str("(")?;
-                let _ = self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
                 let exp = self.expression(p)?.value;
-                let _ = self.opt_sp(p)?;
-                let _ = p.str(")")?;
+                self.opt_sp(p)?;
+                p.str(")")?;
                 Some(p.parsed(exp))
             })
         })
@@ -362,13 +362,25 @@ impl Parser {
             Some(Parsed {range, value: ast::Expression::identifier_expression(value)})
         })
     }
+    
+    pub fn identifier(&self, p: &mut impl PegParser) -> Option<Parsed<String>> {
+        p.for_rule(RuleName::Identifier, |p| {
+            p.to_parsed(|p| {
+                // FIXME - make sure it's not a reserved word
+                let first = p.char_class(&IDENTIFIER_START_CHARS)?;
+                let rest = p.star(|p| p.char_class(&IDENTIFIER_REST_CHARS))?;
+                // Collect the Vec<Parsed<char>> into a String
+                Some(first_and_rest(first, rest).iter().map(|i| i.value).collect::<String>())
+            })
+        })
+    }
 
     pub fn literal_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         p.for_rule(RuleName::LiteralExpression, |p| {
             if let Some(r) = self.boolean_literal(p) {Some(r)}
             else if let Some(r) = self.int_literal(p) {Some(r)}
             else if let Some(r) = self.null_literal(p) {Some(r)}
-            // FIXME - add string literal
+            else if let Some(r) = self.string_literal(p) {Some(r)}
             // FIXME - add string template
             else {None}
         })
@@ -379,13 +391,13 @@ impl Parser {
             if let Some(r) = p.parse(|p| {
                 let value = p.str("true")?;
                 // Must be followed by a non-identifier char or eof
-                let _ = self.word_boundary(p)?;
+                self.word_boundary(p)?;
                 Some(p.parsed(value))
             }) {Some(r.with_value(ast::Expression::BooleanLiteral(true)))}
             else if let Some(r) = p.parse(|p| {
                 let value = p.str("false")?;
                 // Must be followed by a non-identifier char or eof
-                let _ = self.word_boundary(p)?;
+                self.word_boundary(p)?;
                 Some(p.parsed(value))
             }) {Some(r.with_value(ast::Expression::BooleanLiteral(false)))}
             else {None}
@@ -397,7 +409,7 @@ impl Parser {
             if let Some(r) = p.parse(|p| {
                 let value = p.str("null")?;
                 // Must be followed by a non-identifier char or eof
-                let _ = self.word_boundary(p)?;
+                self.word_boundary(p)?;
                 Some(p.parsed(value))
             }) {Some(r.with_value(ast::Expression::null_literal()))}
             else {None}
@@ -411,8 +423,115 @@ impl Parser {
         })
     }
 
+    pub fn string_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::StringLiteral, |p| {
+            if let Some(r) = self.string_literal_for_delimiter(p, '\'') {Some(r)}
+            else if let Some(r) = self.string_literal_for_delimiter(p, '\"') {Some(r)}
+            else {None}
+        })
+    }
 
+    pub fn string_literal_for_delimiter(&self, p: &mut impl PegParser, delimiter: char) -> Option<Parsed<ast::Expression>> {
+        p.ch(delimiter)?;
+        let chars = p.star(|p| self.string_literal_char(p, delimiter))?.value;
+        p.ch(delimiter)?;
 
+        // Unwrap the chars, remove any that are line continuations ("\" followed by line break), collect to string
+        let value = chars.into_iter().map(|v| v.value.to_char()).flatten().collect();
+        Some(p.parsed(ast::Expression::string_literal(value)))
+    }
+
+    pub fn string_literal_char(&self, p: &mut impl PegParser, delimiter: char) -> Option<Parsed<CharOrLineBreak>> {
+        p.for_rule(RuleName::StringLiteralChar, |p| {
+            // Check for "regular" characters (anything but the delimiter or escape)
+            if let Some(r) = p.parse(|p| {
+                let singles = [delimiter, '\\'];
+                let char_class = CharClass::new().except().chars(&singles);
+                let ch = p.char_class(&char_class)?;
+                Some(ch.map_value(|v| CharOrLineBreak::Char(*v)))
+            }) {Some(r)}
+            // Check for escape sequences ("\")
+            else if let Some(r) = p.parse(|p| {
+                p.ch('\\')?;
+                if let Some(r) = self.string_literal_escape_single(p, &[
+                    ('n', '\n'),
+                    ('r', '\r'),
+                    ('t', '\t'),
+                    ('v', '\x0b'),
+                    ('b', '\x08'),
+                    ('f', '\x0c'),
+                    ('\\', '\\'),
+                    ('\'', '\''),
+                    ('\"', '\"'),
+                    ('0', '\0'),
+                ]) {Some(p.parsed(r.value))}
+                // Check for hex escape ("\xXX")
+                else if let Some(r) = p.parse(|p| {
+                    p.ch('x')?;
+                    let d0 = self.hex_digit(p)?.value;
+                    let d1 = self.hex_digit(p)?.value;
+                    let char_code = (d0 << 4) | d1;
+                    let value = CharOrLineBreak::Char(char::from_u32(char_code)?);
+                    Some(p.parsed(value))
+                }) {Some(p.parsed(r.value))}
+                // Check for unicode escape ("\uXXXX")
+                else if let Some(r) = p.parse(|p| {
+                    p.ch('u')?;
+                    let d0 = self.hex_digit(p)?.value;
+                    let d1 = self.hex_digit(p)?.value;
+                    let d2 = self.hex_digit(p)?.value;
+                    let d3 = self.hex_digit(p)?.value;
+                    let char_code = (d0 << 12) | (d1 << 8) | (d2 << 4) | d3;
+                    // FIXME - from_u32 returning None might mess up error handling
+                    let value = CharOrLineBreak::Char(char::from_u32(char_code)?);
+                    Some(p.parsed(value))
+                }) {Some(p.parsed(r.value))}
+                // Check for unicode codepoint ("\u{X...}")
+                else if let Some(r) = p.parse(|p| {
+                    p.str("u{")?;
+                    let digits = p.plus(|p| self.hex_digit(p))?.value;
+                    p.str("}")?;
+                    if digits.len() > 6 {
+                        // FIXME - this might mess up error handling.  Better to have a version of p.plus that takes a maximum
+                        None
+                    }
+                    else {
+                        let char_code = digits.iter().fold(0, |acc, v| (acc << 4) + v.value);
+                        let value = CharOrLineBreak::Char(char::from_u32(char_code)?);
+                        Some(p.parsed(value))
+                    }
+                }) {Some(p.parsed(r.value))}
+                // "\" followed by newline is just a continuation
+                else if let Some(r) = p.parse(|p| {
+                    p.char_class(&NEWLINE_CHARS)?;
+                    Some(p.parsed(CharOrLineBreak::LineBreak))
+                }) {Some(p.parsed(r.value))}
+                // "\" followed by anything else (except the delimiter) is just that character
+                else if let Some(r) = p.parse(|p| {
+                    let singles = [delimiter];
+                    let char_class = CharClass::new().except().chars(&singles);
+                    let ch = p.char_class(&char_class)?;
+                    Some(ch.map_value(|v| CharOrLineBreak::Char(*v)))
+                }) {Some(p.parsed(r.value))}
+                else {None}
+            }) {Some(r)}
+            else {None}
+        })
+    }
+
+    fn hex_digit(&self, p: &mut impl PegParser) -> Option<Parsed<u32>> {
+        p.parse(|p| {
+            let ch = p.char_class(&HEX_DIGIT)?;
+            Some(ch.map_value(|v| v.to_digit(16).unwrap()))
+        })
+    }
+
+    fn string_literal_escape_single(&self, p: &mut impl PegParser, mapping: &[(char, char)]) -> Option<Parsed<CharOrLineBreak>> {
+        for (src, dest) in mapping {
+            if let Some(s) = p.ch(*src) {return Some(s.with_value(CharOrLineBreak::Char(*dest)))}
+        }
+        None
+    }
     
 
 
@@ -446,21 +565,10 @@ impl Parser {
         })
     }
     
-    pub fn identifier(&self, p: &mut impl PegParser) -> Option<Parsed<String>> {
-        p.for_rule(RuleName::Identifier, |p| {
-            p.to_parsed(|p| {
-                let first = p.char_class(&IDENTIFIER_START_CHARS)?;
-                let rest = p.star(|p| p.char_class(&IDENTIFIER_REST_CHARS))?;
-                // Collect the Vec<Parsed<char>> into a String
-                Some(first_and_rest(first, rest).iter().map(|i| i.value).collect::<String>())
-            })
-        })
-    }
-    
     fn int_literal_radix(&self, p: &mut impl PegParser, prefix: &'static str, char_class: &CharClass, radix: u32, ast_radix: ast::Radix) -> Option<Parsed<ast::Expression>>
     {
         p.to_parsed(|p| {
-            let _ = p.str(prefix)?;
+            p.str(prefix)?;
             let first = p.char_class(char_class)?.map_value(|v| DigitOrUnderscore::Digit(*v));
             let rest = p.star(|p| {
                 if let Some(r) = p.ch('_') {
@@ -534,6 +642,8 @@ pub enum RuleName {
     Identifier,
     BooleanLiteral,
     NullLiteral,
+    StringLiteral,
+    StringLiteralChar,
     DecimalLiteral,
     HexLiteral,
     OctalLiteral,
@@ -579,6 +689,7 @@ const OCTAL_DIGIT: CharClass = CharClass::new()
     .ranges(&[('0', '7')]);
 const BINARY_DIGIT: CharClass = CharClass::new()
     .ranges(&[('0', '1')]);
+const NEWLINE_CHARS: CharClass = CharClass::new().chars(&['\r', '\n']);
 
 pub enum DigitOrUnderscore {
     Digit(char),
@@ -586,16 +697,31 @@ pub enum DigitOrUnderscore {
 }
 
 // Combines the given first and rest into a single Vec with a range spanning both
-pub fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Vec<Parsed<R>> {
+fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Vec<Parsed<R>> {
     std::iter::once(first).chain(rest.value.into_iter()).collect()
 }
 
 // Collect digit characters into a single u32 parsed with the given radix, ignoring underscores
-pub fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
+fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
     digits.iter().fold(0, |acc, v| {
         match v.value {
             DigitOrUnderscore::Digit(d) => (acc * radix) + d.to_digit(radix).unwrap(),
             _ => acc
         }
     })
+}
+
+pub enum CharOrLineBreak {
+    Char(char),
+    // Represents a "\" followed by a newline, representing a line continuation in a string literal that doesn't actually contribute any characters
+    LineBreak,
+}
+
+impl CharOrLineBreak {
+    pub fn to_char(&self) -> Option<char> {
+        match self {
+            Self::Char(ch) => Some(*ch),
+            Self::LineBreak => None,
+        }
+    }
 }

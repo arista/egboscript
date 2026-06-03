@@ -266,13 +266,13 @@ pub struct ParsedRange {
 }
 
 // Represents a set of characters and character ranges to be matched (or not matched if negated is true)
-pub struct CharClass {
+pub struct CharClass<'a> {
     negated: bool,
-    singles: &'static [char],
-    ranges: &'static [(char, char)],
+    singles: &'a [char],
+    ranges: &'a [(char, char)],
 }
 
-impl CharClass {
+impl<'a> CharClass<'a> {
     pub const fn new() -> Self {
         Self {
             negated: false,
@@ -289,7 +289,7 @@ impl CharClass {
         }
     }
 
-    pub const fn chars(&self, singles: &'static [char]) -> Self {
+    pub const fn chars(&self, singles: &'a [char]) -> Self {
         Self {
             negated: self.negated,
             singles,
@@ -297,7 +297,7 @@ impl CharClass {
         }
     }
 
-    pub const fn ranges(&self, ranges: &'static [(char, char)]) -> Self {
+    pub const fn ranges(&self, ranges: &'a [(char, char)]) -> Self {
         Self {
             negated: self.negated,
             singles: self.singles,
