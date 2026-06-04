@@ -1,6 +1,96 @@
 use crate::peg_parser::Parsed;
 
 #[derive(Debug)]
+pub enum Statement {
+    EmptyStatement,
+    ExpressionStatement(ExpressionStatement),
+    IfStatement(IfStatement),
+    WhileStatement(WhileStatement),
+    ReturnStatement(ReturnStatement),
+    BreakStatement(BreakStatement),
+    ContinueStatement(ContinueStatement),
+}
+
+impl Statement {
+    pub fn empty_statement() -> Self {
+        Self::EmptyStatement
+    }
+    
+    pub fn expression_statement(exp: Parsed<Expression>) -> Self {
+        Self::ExpressionStatement(ExpressionStatement {
+            exp: Box::new(exp),
+        })
+    }
+    
+    pub fn if_statement(test: Parsed<Expression>, if_true: Parsed<Statement>, if_false: Option<Parsed<Statement>>) -> Self {
+        Self::IfStatement(IfStatement {
+            test: Box::new(test),
+            if_true: Box::new(if_true),
+            if_false: if_false.map(|v| Box::new(v)),
+        })
+    }
+    
+    pub fn while_statement(test: Parsed<Expression>, stmt: Parsed<Statement>) -> Self {
+        Self::WhileStatement(WhileStatement {
+            test: Box::new(test),
+            stmt: Box::new(stmt),
+        })
+    }
+    
+    pub fn return_statement(exp: Option<Parsed<Expression>>) -> Self {
+        Self::ReturnStatement(ReturnStatement {
+            exp: exp.map(|v| Box::new(v)),
+        })
+    }
+    
+    pub fn break_statement(label: Option<Parsed<String>>) -> Self {
+        Self::BreakStatement(BreakStatement {
+            label,
+        })
+    }
+    
+    pub fn continue_statement(label: Option<Parsed<String>>) -> Self {
+        Self::ContinueStatement(ContinueStatement {
+            label,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct ExpressionStatement {
+    pub exp: Box<Parsed<Expression>>
+}
+
+#[derive(Debug)]
+pub struct IfStatement {
+    pub test: Box<Parsed<Expression>>,
+    pub if_true: Box<Parsed<Statement>>,
+    pub if_false: Option<Box<Parsed<Statement>>>,
+}
+
+#[derive(Debug)]
+pub struct WhileStatement {
+    pub test: Box<Parsed<Expression>>,
+    pub stmt: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct ReturnStatement {
+    pub exp: Option<Box<Parsed<Expression>>>,
+}
+
+#[derive(Debug)]
+pub struct BreakStatement {
+    pub label: Option<Parsed<String>>,
+}
+
+#[derive(Debug)]
+pub struct ContinueStatement {
+    pub label: Option<Parsed<String>>,
+}
+
+
+#[derive(Debug)]
 pub enum Expression {
     CommaExpression(CommaExpression),
     TernaryExpression(TernaryExpression),

@@ -40,6 +40,10 @@ pub trait PegParser {
     where
         F: Fn(&mut Self)->Option<Parsed<R>>;
 
+    fn lookahead<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>>;
+
     fn to_parsed<R, F>(&mut self, f: F) -> Option<Parsed<R>>
     where
         F: Fn(&mut Self)->Option<R>;
@@ -198,6 +202,16 @@ impl<'a> PegParser for PegParserImpl<'a> {
                 None => Some(p.parsed(()))
             }
         })
+    }
+
+    // Returns the function's return value, but resets the current position regardless of Some or None
+    fn lookahead<R, F>(&mut self, f: F) -> Option<Parsed<R>>
+    where
+        F: Fn(&mut Self)->Option<Parsed<R>> {
+        let start = self.pos;
+        let ret = f(self);
+        self.pos = start;
+        ret
     }
 
     // FIXME - this should eventually go away

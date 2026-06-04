@@ -29,7 +29,7 @@ fn main() -> std::io::Result<()> {
 
             let mut pparser = peg_parser::PegParserImpl::new(contents.as_str());
             let parser = parser::Parser::new();
-            let result = parser.expression(&mut pparser);
+            let result = parser.statement(&mut pparser);
 
             println!("Result: {:#?}", result);
             

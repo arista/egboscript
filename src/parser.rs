@@ -12,6 +12,127 @@ impl Parser {
         Self {}
     }
 
+    pub fn statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::Statement, |p| {
+            p.parse(|p| {
+                if let Some(r) = self.empty_statement(p) {Some(r)}
+                else if let Some(r) = self.expression_statement(p) {Some(r)}
+                else if let Some(r) = self.if_statement(p) {Some(r)}
+                else if let Some(r) = self.while_statement(p) {Some(r)}
+                else if let Some(r) = self.return_statement(p) {Some(r)}
+                else if let Some(r) = self.break_statement(p) {Some(r)}
+                else if let Some(r) = self.continue_statement(p) {Some(r)}
+                // FIXME - don't forget to add to reserved words
+                // FIXME - block statement
+                // FIXME - for statement
+                // FIXME - switch statement
+                else {None}
+            })
+        })
+    }
+
+    pub fn empty_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::EmptyStatement, |p| {
+            p.parse(|p| {
+                Some(p.ch(';')?.with_value(ast::Statement::empty_statement()))
+            })
+        })
+    }
+
+    pub fn expression_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::ExpressionStatement, |p| {
+            p.parse(|p| {
+                let exp = self.expression(p)?;
+                self.opt_sp(p)?;
+                self.statement_end(p)?;
+                Some(p.parsed(ast::Statement::expression_statement(exp)))
+            })
+        })
+    }
+
+    pub fn if_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::WhileStatement, |p| {
+            p.parse(|p| {
+                p.str("if")?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
+                let test = self.expression(p)?;
+                self.opt_sp(p)?;
+                p.str(")")?;
+                self.opt_sp(p)?;
+                let if_true = self.statement(p)?;
+                let if_false = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    p.str("else")?;
+                    self.opt_sp(p)?;
+                    let stmt = self.statement(p)?.value;
+                    Some(p.parsed(stmt))
+                });
+                Some(p.parsed(ast::Statement::if_statement(test, if_true, if_false)))
+            })
+        })
+    }
+
+    pub fn while_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::WhileStatement, |p| {
+            p.parse(|p| {
+                p.str("while")?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
+                let test = self.expression(p)?;
+                self.opt_sp(p)?;
+                p.str(")")?;
+                self.opt_sp(p)?;
+                let stmt = self.statement(p)?;
+                Some(p.parsed(ast::Statement::while_statement(test, stmt)))
+            })
+        })
+    }
+
+    pub fn return_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::WhileStatement, |p| {
+            p.parse(|p| {
+                p.str("return")?;
+                let exp = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    self.expression(p)
+                });
+                self.statement_end(p)?;
+                Some(p.parsed(ast::Statement::return_statement(exp)))
+            })
+        })
+    }
+
+    pub fn break_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::WhileStatement, |p| {
+            p.parse(|p| {
+                p.str("break")?;
+                let label = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    self.identifier(p)
+                });
+                self.statement_end(p)?;
+                Some(p.parsed(ast::Statement::break_statement(label)))
+            })
+        })
+    }
+
+    pub fn continue_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::WhileStatement, |p| {
+            p.parse(|p| {
+                p.str("continue")?;
+                let label = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    self.identifier(p)
+                });
+                self.statement_end(p)?;
+                Some(p.parsed(ast::Statement::continue_statement(label)))
+            })
+        })
+    }
+    
     pub fn expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
         self.comma_expression(p)
     }
@@ -375,6 +496,9 @@ impl Parser {
     pub fn identifier(&self, p: &mut impl PegParser) -> Option<Parsed<String>> {
         p.for_rule(RuleName::Identifier, |p| {
             p.to_parsed(|p| {
+                // Make sure it's not a reserved word
+                p.not(|p| self.reserved_word(p))?;
+                
                 // FIXME - make sure it's not a reserved word
                 let first = p.char_class(&IDENTIFIER_START_CHARS)?;
                 let rest = p.star(|p| p.char_class(&IDENTIFIER_REST_CHARS))?;
@@ -382,6 +506,22 @@ impl Parser {
                 Some(first_and_rest(first, rest).iter().map(|i| i.value).collect::<String>())
             })
         })
+    }
+
+    pub fn reserved_word(&self, p: &mut impl PegParser) -> Option<Parsed<&'static str>> {
+        p.for_rule(RuleName::ReservedWord, |p| {
+            let word = self.match_str(p, &RESERVED_WORDS)?;
+            self.word_boundary(p)?;
+            Some(word)
+        })
+    }
+
+    fn match_str(&self, p: &mut impl PegParser, match_strs: &[&'static str]) -> Option<Parsed<&'static str>>
+    {
+        for s in match_strs {
+            if let Some(r) = p.str(s) {return Some(r)}
+        }
+        None
     }
 
     pub fn literal_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
@@ -654,10 +794,54 @@ impl Parser {
         })
     }
 
+    // Space that doesn't include newlines (used in finding statement ends)
+    pub fn no_line_end_space(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::NoLineEndSpace, |p| {
+            if let Some(r) = p.plus(|p| {
+                if let Some(r) = p.char_class(&NO_LINE_END_WS_CHARS) {Some(r.with_value(()))}
+                else if let Some(r) = self.block_comment(p) {Some(r.with_value(()))}
+                else {None}
+            }) {Some(r.with_value(()))}
+            else {None}
+        })
+    }
+
+    // Things that can terminate a statement
+    pub fn statement_end(&self, p: &mut impl PegParser) -> Option<Parsed<()>> {
+        p.for_rule(RuleName::StatementEnd, |p| {
+            p.parse(|p| {
+                // Consume any space up to potential statement enders
+                p.opt(|p| self.no_line_end_space(p))?;
+                p.parse(|p| {
+                    if let Some(r) = p.ch(';') {Some(r.with_value(()))}
+                    else if let Some(r) = self.line_comment(p) {Some(r.with_value(()))}
+                    else if let Some(r) = p.char_class(&NEWLINE_CHARS) {Some(r.with_value(()))}
+                    // Covers the last statement in a file
+                    else if let Some(r) = p.lookahead(|p| p.eof()) {Some(r.with_value(()))}
+                    // Covers the last statement in a block
+                    else if let Some(r) = p.lookahead(|p| p.ch('}')) {Some(r.with_value(()))}
+                    // Covers the "advance" statement in a for(..;..;..) statement
+                    else if let Some(r) = p.lookahead(|p| p.ch(')')) {Some(r.with_value(()))}
+                    else {None}
+                })?;
+                Some(p.parsed(()))
+            })
+        })
+    }
 }
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum RuleName {
+    Statement,
+    EmptyStatement,
+    ExpressionStatement,
+    IfStatement,
+    WhileStatement,
+    BreakStatement,
+    ContinueStatement,
+    ReturnStatement,
+    BlockStatement,
+
     CommaExpression,
     AssignmentExpression,
     TernaryExpression,
@@ -671,6 +855,7 @@ pub enum RuleName {
     BlockComment,
     WordBoundary,
     Identifier,
+    ReservedWord,
     BooleanLiteral,
     NullLiteral,
     StringLiteral,
@@ -703,10 +888,14 @@ pub enum RuleName {
     PrimaryExpression,
     IdentifierExpression,
     LiteralExpression,
+
+    NoLineEndSpace,
+    StatementEnd,
 }
 
 const ANY_CHAR: CharClass = CharClass::new().except();
 const WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\n', '\r', '\t']);
+const NO_LINE_END_WS_CHARS: CharClass = CharClass::new().chars(&[' ', '\t']);
 const IDENTIFIER_START_CHARS: CharClass = CharClass::new()
     .ranges(&[('A', 'Z'), ('a', 'z')])
     .chars(&['_']);
@@ -723,6 +912,22 @@ const BINARY_DIGIT: CharClass = CharClass::new()
     .ranges(&[('0', '1')]);
 const NEWLINE_CHARS: CharClass = CharClass::new().chars(&['\r', '\n']);
 const NOT_NEWLINE_CHARS: CharClass = NEWLINE_CHARS.except();
+
+const RESERVED_WORDS: &[&str] = &[
+    "true",
+    "false",
+    "null",
+    "if",
+    "else",
+    "while",
+    "return",
+    "break",
+    "continue",
+    "switch",
+    "case",
+    "default",
+    "function",
+];
 
 pub enum DigitOrUnderscore {
     Digit(char),
