@@ -6,6 +6,8 @@ Its memory model does not rely on garbage collection, allowing its memory use to
 
 The language is designed to be simple to pick up, reducing the barrier for entry into embedded systems or plug-in development.  But it also many modern features that allow for expressive and type-safe program development.
 
+As far as I'm aware, this language occupies a niche that isn't quite filled by any other language.
+
 ## Approach
 
 The script uses TypeScript as its design starting point, borrowing much of its syntax and concepts.  It does not, however, use any TypeScript or JavaScript runtime technology, so it is not constrained by any of the limitations in that language.
