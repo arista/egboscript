@@ -9,6 +9,7 @@ pub enum Statement {
     ReturnStatement(ReturnStatement),
     BreakStatement(BreakStatement),
     ContinueStatement(ContinueStatement),
+    BlockStatement(BlockStatement),
 }
 
 impl Statement {
@@ -54,6 +55,12 @@ impl Statement {
             label,
         })
     }
+    
+    pub fn block_statement(stmts: Parsed<Vec<Parsed<Statement>>>) -> Self {
+        Self::BlockStatement(BlockStatement {
+            stmts: Box::new(stmts),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -87,6 +94,11 @@ pub struct BreakStatement {
 #[derive(Debug)]
 pub struct ContinueStatement {
     pub label: Option<Parsed<String>>,
+}
+
+#[derive(Debug)]
+pub struct BlockStatement {
+    pub stmts: Box<Parsed<Vec<Parsed<Statement>>>>,
 }
 
 

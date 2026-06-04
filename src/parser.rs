@@ -22,8 +22,8 @@ impl Parser {
                 else if let Some(r) = self.return_statement(p) {Some(r)}
                 else if let Some(r) = self.break_statement(p) {Some(r)}
                 else if let Some(r) = self.continue_statement(p) {Some(r)}
+                else if let Some(r) = self.block_statement(p) {Some(r)}
                 // FIXME - don't forget to add to reserved words
-                // FIXME - block statement
                 // FIXME - for statement
                 // FIXME - switch statement
                 else {None}
@@ -92,7 +92,7 @@ impl Parser {
     }
 
     pub fn return_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
-        p.for_rule(RuleName::WhileStatement, |p| {
+        p.for_rule(RuleName::ReturnStatement, |p| {
             p.parse(|p| {
                 p.str("return")?;
                 let exp = p.parse(|p| {
@@ -106,7 +106,7 @@ impl Parser {
     }
 
     pub fn break_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
-        p.for_rule(RuleName::WhileStatement, |p| {
+        p.for_rule(RuleName::BreakStatement, |p| {
             p.parse(|p| {
                 p.str("break")?;
                 let label = p.parse(|p| {
@@ -120,7 +120,7 @@ impl Parser {
     }
 
     pub fn continue_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
-        p.for_rule(RuleName::WhileStatement, |p| {
+        p.for_rule(RuleName::ContinueStatement, |p| {
             p.parse(|p| {
                 p.str("continue")?;
                 let label = p.parse(|p| {
@@ -129,6 +129,21 @@ impl Parser {
                 });
                 self.statement_end(p)?;
                 Some(p.parsed(ast::Statement::continue_statement(label)))
+            })
+        })
+    }
+
+    pub fn block_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::BlockStatement, |p| {
+            p.parse(|p| {
+                p.str("{")?;
+                let stmts = p.star(|p| {
+                    self.opt_sp(p)?;
+                    self.statement(p)
+                })?;
+                self.opt_sp(p)?;
+                p.str("}")?;
+                Some(p.parsed(ast::Statement::block_statement(stmts)))
             })
         })
     }
