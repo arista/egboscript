@@ -10,6 +10,8 @@ pub enum Statement {
     BreakStatement(BreakStatement),
     ContinueStatement(ContinueStatement),
     BlockStatement(BlockStatement),
+    ForStatement(ForStatement),
+    SwitchStatement(SwitchStatement),
 }
 
 impl Statement {
@@ -61,6 +63,22 @@ impl Statement {
             stmts: Box::new(stmts),
         })
     }
+    
+    pub fn for_statement(init: Parsed<Statement>, test: Option<Parsed<Expression>>, advance: Option<Parsed<Statement>>, stmt: Parsed<Statement>) -> Self {
+        Self::ForStatement(ForStatement {
+            init: Box::new(init),
+            test: test.map(|v| Box::new(v)),
+            advance: advance.map(|v| Box::new(v)),
+            stmt: Box::new(stmt),
+        })
+    }
+    
+    pub fn switch_statement(exp: Parsed<Expression>, items: Parsed<Vec<Parsed<SwitchItem>>>) -> Self {
+        Self::SwitchStatement(SwitchStatement {
+            exp: Box::new(exp),
+            items: Box::new(items),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -99,6 +117,27 @@ pub struct ContinueStatement {
 #[derive(Debug)]
 pub struct BlockStatement {
     pub stmts: Box<Parsed<Vec<Parsed<Statement>>>>,
+}
+
+#[derive(Debug)]
+pub struct ForStatement {
+    pub init: Box<Parsed<Statement>>,
+    pub test: Option<Box<Parsed<Expression>>>,
+    pub advance: Option<Box<Parsed<Statement>>>,
+    pub stmt: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct SwitchStatement {
+    pub exp: Box<Parsed<Expression>>,
+    pub items: Box<Parsed<Vec<Parsed<SwitchItem>>>>,
+}
+
+#[derive(Debug)]
+pub enum SwitchItem {
+    Statement(Parsed<Statement>),
+    Case(Parsed<Expression>),
+    Default,
 }
 
 

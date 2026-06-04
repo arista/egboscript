@@ -23,9 +23,9 @@ impl Parser {
                 else if let Some(r) = self.break_statement(p) {Some(r)}
                 else if let Some(r) = self.continue_statement(p) {Some(r)}
                 else if let Some(r) = self.block_statement(p) {Some(r)}
+                else if let Some(r) = self.for_statement(p) {Some(r)}
+                else if let Some(r) = self.switch_statement(p) {Some(r)}
                 // FIXME - don't forget to add to reserved words
-                // FIXME - for statement
-                // FIXME - switch statement
                 else {None}
             })
         })
@@ -144,6 +144,71 @@ impl Parser {
                 self.opt_sp(p)?;
                 p.str("}")?;
                 Some(p.parsed(ast::Statement::block_statement(stmts)))
+            })
+        })
+    }
+
+    pub fn for_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::ForStatement, |p| {
+            p.parse(|p| {
+                p.str("for")?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
+                let init = self.statement(p)?;
+                self.opt_sp(p)?;
+                let test = self.expression(p);
+                self.opt_sp(p)?;
+                p.str(";")?;
+                self.opt_sp(p)?;
+                let advance = self.statement(p);
+                self.opt_sp(p)?;
+                p.str(")")?;
+                self.opt_sp(p)?;
+                let stmt = self.statement(p)?;
+                Some(p.parsed(ast::Statement::for_statement(init, test, advance, stmt)))
+            })
+        })
+    }
+    
+    pub fn switch_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::ForStatement, |p| {
+            p.parse(|p| {
+                p.str("switch")?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                self.opt_sp(p)?;
+                let exp = self.expression(p)?;
+                self.opt_sp(p)?;
+                p.str(")")?;
+                self.opt_sp(p)?;
+                p.str("{")?;
+                let items = p.star(|p| {
+                    self.opt_sp(p)?;
+                    if let Some(r) = p.parse(|p| {
+                        p.str("default")?;
+                        self.opt_sp(p)?;
+                        p.str(":")?;
+                        Some(p.parsed(ast::SwitchItem::Default))
+                    }) {Some(r)}
+                    else if let Some(r) = p.parse(|p| {
+                        p.str("case")?;
+                        self.opt_sp(p)?;
+                        let cexp = self.expression(p)?;
+                        self.opt_sp(p)?;
+                        p.str(":")?;
+                        Some(p.parsed(ast::SwitchItem::Case(cexp)))
+                    }) {Some(r)}
+                    else if let Some(r) = p.parse(|p| {
+                        self.opt_sp(p)?;
+                        let stmt = self.statement(p)?;
+                        Some(p.parsed(ast::SwitchItem::Statement(stmt)))
+                    }) {Some(r)}
+                    else {None}
+                })?;
+                self.opt_sp(p)?;
+                p.str("}")?;
+                Some(p.parsed(ast::Statement::switch_statement(exp, items)))
             })
         })
     }
@@ -856,6 +921,8 @@ pub enum RuleName {
     ContinueStatement,
     ReturnStatement,
     BlockStatement,
+    ForStatement,
+    SwitchStatement,
 
     CommaExpression,
     AssignmentExpression,
@@ -938,6 +1005,7 @@ const RESERVED_WORDS: &[&str] = &[
     "return",
     "break",
     "continue",
+    "for",
     "switch",
     "case",
     "default",
