@@ -12,6 +12,7 @@ pub enum Statement {
     BlockStatement(BlockStatement),
     ForStatement(ForStatement),
     SwitchStatement(SwitchStatement),
+    VarDeclStatement(VarDeclStatement),
 }
 
 impl Statement {
@@ -64,9 +65,9 @@ impl Statement {
         })
     }
     
-    pub fn for_statement(init: Parsed<Statement>, test: Option<Parsed<Expression>>, advance: Option<Parsed<Statement>>, stmt: Parsed<Statement>) -> Self {
+    pub fn for_statement(init: Option<Parsed<ForInit>>, test: Option<Parsed<Expression>>, advance: Option<Parsed<Expression>>, stmt: Parsed<Statement>) -> Self {
         Self::ForStatement(ForStatement {
-            init: Box::new(init),
+            init: init.map(|v| Box::new(v)),
             test: test.map(|v| Box::new(v)),
             advance: advance.map(|v| Box::new(v)),
             stmt: Box::new(stmt),
@@ -77,6 +78,13 @@ impl Statement {
         Self::SwitchStatement(SwitchStatement {
             exp: Box::new(exp),
             items: Box::new(items),
+        })
+    }
+
+    pub fn var_decl_statement(name: Parsed<String>, init: Option<Parsed<Expression>>) -> Self {
+        Self::VarDeclStatement(VarDeclStatement {
+            name,
+            init: init.map(|v| Box::new(v)),
         })
     }
 }
@@ -121,10 +129,16 @@ pub struct BlockStatement {
 
 #[derive(Debug)]
 pub struct ForStatement {
-    pub init: Box<Parsed<Statement>>,
+    pub init: Option<Box<Parsed<ForInit>>>,
     pub test: Option<Box<Parsed<Expression>>>,
-    pub advance: Option<Box<Parsed<Statement>>>,
+    pub advance: Option<Box<Parsed<Expression>>>,
     pub stmt: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub enum ForInit {
+    Expression(Parsed<Expression>),
+    VarDecl(Parsed<Statement>),
 }
 
 #[derive(Debug)]
@@ -140,6 +154,11 @@ pub enum SwitchItem {
     Default,
 }
 
+#[derive(Debug)]
+pub struct VarDeclStatement {
+    pub name: Parsed<String>,
+    pub init: Option<Box<Parsed<Expression>>>,
+}
 
 #[derive(Debug)]
 pub enum Expression {

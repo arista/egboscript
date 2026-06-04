@@ -25,7 +25,7 @@ impl Parser {
                 else if let Some(r) = self.block_statement(p) {Some(r)}
                 else if let Some(r) = self.for_statement(p) {Some(r)}
                 else if let Some(r) = self.switch_statement(p) {Some(r)}
-                // FIXME - don't forget to add to reserved words
+                else if let Some(r) = self.var_decl_statement(p) {Some(r)}
                 else {None}
             })
         })
@@ -155,13 +155,19 @@ impl Parser {
                 self.opt_sp(p)?;
                 p.str("(")?;
                 self.opt_sp(p)?;
-                let init = self.statement(p)?;
+                let init = p.parse(|p| {
+                    if let Some(r) = self.var_decl(p) {Some(p.parsed(ast::ForInit::VarDecl(r)))}
+                    else if let Some(r) = self.expression(p) {Some(p.parsed(ast::ForInit::Expression(r)))}
+                    else {None}
+                });
+                self.opt_sp(p)?;
+                p.str(";")?;
                 self.opt_sp(p)?;
                 let test = self.expression(p);
                 self.opt_sp(p)?;
                 p.str(";")?;
                 self.opt_sp(p)?;
-                let advance = self.statement(p);
+                let advance = self.expression(p);
                 self.opt_sp(p)?;
                 p.str(")")?;
                 self.opt_sp(p)?;
@@ -209,6 +215,36 @@ impl Parser {
                 self.opt_sp(p)?;
                 p.str("}")?;
                 Some(p.parsed(ast::Statement::switch_statement(exp, items)))
+            })
+        })
+    }
+    
+    pub fn var_decl(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::VarDeclStatement, |p| {
+            p.parse(|p| {
+                p.str("var")?;
+                self.opt_sp(p)?;
+                let name = self.identifier(p)?;
+                // FIXME - add type declaration
+                let init = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    p.str("=")?;
+                    self.opt_sp(p)?;
+                    let exp = self.expression(p)?.value;
+                    Some(p.parsed(exp))
+                });
+                Some(p.parsed(ast::Statement::var_decl_statement(name, init)))
+            })
+        })
+    }
+    
+    pub fn var_decl_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::VarDeclStatement, |p| {
+            p.parse(|p| {
+                let stmt = self.var_decl(p)?.value;
+                self.opt_sp(p)?;
+                self.statement_end(p)?;
+                Some(p.parsed(stmt))
             })
         })
     }
@@ -923,6 +959,8 @@ pub enum RuleName {
     BlockStatement,
     ForStatement,
     SwitchStatement,
+    VarDecl,
+    VarDeclStatement,
 
     CommaExpression,
     AssignmentExpression,
@@ -1010,6 +1048,7 @@ const RESERVED_WORDS: &[&str] = &[
     "case",
     "default",
     "function",
+    "var",
 ];
 
 pub enum DigitOrUnderscore {
