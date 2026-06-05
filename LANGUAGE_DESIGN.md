@@ -19,7 +19,7 @@ The main self-imposed limitation is that the maximum memory usage be known at co
     * This may allow some static analysis that wouldn't be possible otherwise.  For example, it may be possible to trace the "pedigree" of all inputs and outputs in order to check for certain cnostraints at runtime
 * No general heap allocation
     * Structures are created as global variables (or stack?  see discussion below)
-    * type-specific "Arenas" are available but must be declared with the maximum # of items they can hold
+    * type-specific "Pools" are available but must be declared with the maximum # of items they can hold
     * Structs and arrays are available, but arrays must declare the maximum # of items, and structures can't be recursive
 * Limited String construction
     * A corrolary to "no heap allocation"
@@ -37,20 +37,20 @@ So what are some options:
 * No pointers at all
     * No pointers allowed at all
     * All references must start from a global struct and "drill down" to whatever data is needed
-    * Not sure how this would work with arena-based allocation
+    * Not sure how this would work with pool-based allocation
     * Seems like it would be super-annyoing to use
     
 * Pointers allowed, but not in data structures
     * Data structures can have nested structures, but they're all stored "inline"
     * Pointers can only be to global data structures
-    * No circular references are possible, so reference-counting can be used for freeing arena resources
-    * When arenas allocate, they return pointers, but those are still effectively pointers to global data
+    * No circular references are possible, so reference-counting can be used for freeing pool resources
+    * When pools allocate, they return pointers, but those are still effectively pointers to global data
         * those pointers are reference counted
         * implies that the compiler needs to support RAII
     * Code can use pointers, including pointers to nested items in structures.  Pointers can be stack variables, function arguments and return values, etc.
     * Usage is simple - in a struct declaration, any use of a type other than a primitive is an inlined type, and in code any use of such a type is a pointer.  Code doesn't need to make distinctions between "pass by value" vs. "pass by reference".
     * Pointers to enums, or data within enums, is tricky (basically a generalization of null pointers)
-        * Perhaps a runtime mechanism "locks" such enums while a nested pointer is in play (using the same RAII required for arenas), so that the enum can't change to a different variant
+        * Perhaps a runtime mechanism "locks" such enums while a nested pointer is in play (using the same RAII required for pools), so that the enum can't change to a different variant
         * Perhaps static code analysis can catch cases of trying to change an enum while a nested pointer is held.
 
 The second seems like a reasonable compromise.  The question is whether this will be too limiting for developers.  Are there really useful cases for storing pointers in structs and arrays that would be terribly missed?  Are there some compromises that could be made?
@@ -60,9 +60,9 @@ The second seems like a reasonable compromise.  The question is whether this wil
 
 ## A Far-Out Thought
 
-Is it possible to do away with arenas altogether, and give the illusion of a heap but still understand maximum memory usage through static analysis?
+Is it possible to do away with pools altogether, and give the illusion of a heap but still understand maximum memory usage through static analysis?
 
-If we are still able to use RAII and no recursive function calls, then in theory there is a limit to the number of places you could actually store pointers to objects, which could serve as an arena hint.  Is it possible to statically analyze this?
+If we are still able to use RAII and no recursive function calls, then in theory there is a limit to the number of places you could actually store pointers to objects, which could serve as an pool hint.  Is it possible to statically analyze this?
 
 ## Other thoughts
 
@@ -81,7 +81,7 @@ With the abaove constraints in mind, how can we squeeze as much power as we can 
     * would be nice to avoid having to use "async/await".  Perhaps static analysis automatically determines if a function needs to be "colored" this way
     * still must be able to statically determine the maximum number of these running, so we can determine max memory usage
         * perhaps use RAII for these - a function can't be left to run "on its own" without some reference holding on to it (the concurrency primitives would count for this)
-        * or perhaps use arenas for these, although that's more of a burden on the developer
+        * or perhaps use pools for these, although that's more of a burden on the developer
 * iterators and generators - it would be nice if these were possible
     * means allocating stack frames
     * similar to the issues around concurrency in terms of understanding max memory usage
@@ -90,4 +90,4 @@ How can we make the language more approachable?
 
 * Allow for a "non-strict" mode, where:
     * type declarations are not required for struct fields, for function declarations
-    * places where sizes must be declared (arena sizes, array sizes, string sizes) will have defaults
+    * places where sizes must be declared (pool sizes, array sizes, string sizes) will have defaults
