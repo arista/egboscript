@@ -27,6 +27,8 @@ impl Parser {
                 else if let Some(r) = self.switch_statement(p) {Some(r)}
                 else if let Some(r) = self.var_decl_statement(p) {Some(r)}
                 else if let Some(r) = self.function_decl_statement(p) {Some(r)}
+                else if let Some(r) = self.labeled_statement(p) {Some(r)}
+                // FIXME - try / catch / finally
                 else {None}
             })
         })
@@ -269,6 +271,19 @@ impl Parser {
                 self.opt_sp(p)?;
                 let stmt = self.block_statement(p)?;
                 Some(p.parsed(ast::Statement::function_decl_statement(name, args, stmt)))
+            })
+        })
+    }
+    
+    pub fn labeled_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::FunctionDeclStatement, |p| {
+            p.parse(|p| {
+                let name = self.identifier(p)?;
+                self.opt_sp(p)?;
+                p.str(":")?;
+                self.opt_sp(p)?;
+                let stmt = self.statement(p)?;
+                Some(p.parsed(ast::Statement::labeled_statement(name, stmt)))
             })
         })
     }
@@ -1017,6 +1032,7 @@ pub enum RuleName {
     FunctionDeclStatement,
     FunctionDeclArg,
     FunctionDeclArgs,
+    LabeledStatement,
 
     CommaExpression,
     AssignmentExpression,
@@ -1105,6 +1121,9 @@ const RESERVED_WORDS: &[&str] = &[
     "default",
     "function",
     "var",
+    "try",
+    "catch",
+    "finally",
 ];
 
 pub enum DigitOrUnderscore {

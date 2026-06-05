@@ -14,6 +14,7 @@ pub enum Statement {
     SwitchStatement(SwitchStatement),
     VarDeclStatement(VarDeclStatement),
     FunctionDeclStatement(FunctionDeclStatement),
+    LabeledStatement(LabeledStatement),
 }
 
 impl Statement {
@@ -94,6 +95,13 @@ impl Statement {
             name,
             args,
             body: Box::new(body),
+        })
+    }
+
+    pub fn labeled_statement(name: Parsed<String>, stmt: Parsed<Statement>) -> Self {
+        Self::LabeledStatement(LabeledStatement {
+            name,
+            stmt: Box::new(stmt),
         })
     }
 }
@@ -181,6 +189,12 @@ pub struct FunctionDeclStatement {
 pub struct FunctionDeclArg {
     pub name: Parsed<String>,
     // FIXME - add arg type
+}
+
+#[derive(Debug)]
+pub struct LabeledStatement {
+    pub name: Parsed<String>,
+    pub stmt: Box<Parsed<Statement>>,
 }
 
 #[derive(Debug)]
