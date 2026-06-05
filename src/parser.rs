@@ -26,6 +26,7 @@ impl Parser {
                 else if let Some(r) = self.for_statement(p) {Some(r)}
                 else if let Some(r) = self.switch_statement(p) {Some(r)}
                 else if let Some(r) = self.var_decl_statement(p) {Some(r)}
+                else if let Some(r) = self.function_decl_statement(p) {Some(r)}
                 else {None}
             })
         })
@@ -245,6 +246,58 @@ impl Parser {
                 self.opt_sp(p)?;
                 self.statement_end(p)?;
                 Some(p.parsed(stmt))
+            })
+        })
+    }
+    
+    pub fn function_decl_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::FunctionDeclStatement, |p| {
+            p.parse(|p| {
+                p.str("function")?;
+                self.opt_sp(p)?;
+                let name = self.identifier(p)?;
+                self.opt_sp(p)?;
+                p.str("(")?;
+                let args = self.function_decl_args(p)?;
+                self.opt_sp(p)?;
+                p.opt(|p| {
+                    p.str(",")?;
+                    self.opt_sp(p)?;
+                    Some(p.parsed(()))
+                })?;
+                p.str(")")?;
+                self.opt_sp(p)?;
+                let stmt = self.block_statement(p)?;
+                Some(p.parsed(ast::Statement::function_decl_statement(name, args, stmt)))
+            })
+        })
+    }
+    
+    pub fn function_decl_arg(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FunctionDeclArg>> {
+        p.for_rule(RuleName::FunctionDeclArg, |p| {
+            p.parse(|p| {
+                self.opt_sp(p)?;
+                let name = self.identifier(p)?;
+                Some(p.parsed(ast::FunctionDeclArg {name}))
+            })
+        })
+    }
+    
+    pub fn function_decl_args(&self, p: &mut impl PegParser) -> Option<Parsed<Vec<Parsed<ast::FunctionDeclArg>>>> {
+        p.for_rule(RuleName::FunctionDeclArgs, |p| {
+            p.parse(|p| {
+                if let Some(first) = self.function_decl_arg(p) {
+                    let rest = p.star(|p| {
+                        self.opt_sp(p)?;
+                        p.str(",")?;
+                        self.opt_sp(p)?;
+                        self.function_decl_arg(p)
+                    })?;
+                    Some(p.parsed(first_and_rest(first, rest)))
+                }
+                else {
+                    Some(p.parsed(Vec::new()))
+                }
             })
         })
     }
@@ -961,6 +1014,9 @@ pub enum RuleName {
     SwitchStatement,
     VarDecl,
     VarDeclStatement,
+    FunctionDeclStatement,
+    FunctionDeclArg,
+    FunctionDeclArgs,
 
     CommaExpression,
     AssignmentExpression,

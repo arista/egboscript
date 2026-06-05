@@ -13,6 +13,7 @@ pub enum Statement {
     ForStatement(ForStatement),
     SwitchStatement(SwitchStatement),
     VarDeclStatement(VarDeclStatement),
+    FunctionDeclStatement(FunctionDeclStatement),
 }
 
 impl Statement {
@@ -87,6 +88,14 @@ impl Statement {
             init: init.map(|v| Box::new(v)),
         })
     }
+
+    pub fn function_decl_statement(name: Parsed<String>, args: Parsed<Vec<Parsed<FunctionDeclArg>>>, body: Parsed<Statement>) -> Self {
+        Self::FunctionDeclStatement(FunctionDeclStatement {
+            name,
+            args,
+            body: Box::new(body),
+        })
+    }
 }
 
 #[derive(Debug)]
@@ -158,6 +167,20 @@ pub enum SwitchItem {
 pub struct VarDeclStatement {
     pub name: Parsed<String>,
     pub init: Option<Box<Parsed<Expression>>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclStatement {
+    pub name: Parsed<String>,
+    pub args: Parsed<Vec<Parsed<FunctionDeclArg>>>,
+    // FIXME - add return type
+    pub body: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclArg {
+    pub name: Parsed<String>,
+    // FIXME - add arg type
 }
 
 #[derive(Debug)]
