@@ -28,7 +28,7 @@ impl Parser {
                 else if let Some(r) = self.var_decl_statement(p) {Some(r)}
                 else if let Some(r) = self.function_decl_statement(p) {Some(r)}
                 else if let Some(r) = self.labeled_statement(p) {Some(r)}
-                // FIXME - try / catch / finally
+                else if let Some(r) = self.try_statement(p) {Some(r)}
                 else {None}
             })
         })
@@ -275,19 +275,6 @@ impl Parser {
         })
     }
     
-    pub fn labeled_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
-        p.for_rule(RuleName::FunctionDeclStatement, |p| {
-            p.parse(|p| {
-                let name = self.identifier(p)?;
-                self.opt_sp(p)?;
-                p.str(":")?;
-                self.opt_sp(p)?;
-                let stmt = self.statement(p)?;
-                Some(p.parsed(ast::Statement::labeled_statement(name, stmt)))
-            })
-        })
-    }
-    
     pub fn function_decl_arg(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FunctionDeclArg>> {
         p.for_rule(RuleName::FunctionDeclArg, |p| {
             p.parse(|p| {
@@ -313,6 +300,65 @@ impl Parser {
                 else {
                     Some(p.parsed(Vec::new()))
                 }
+            })
+        })
+    }
+    
+    pub fn labeled_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::LabeledStatement, |p| {
+            p.parse(|p| {
+                let name = self.identifier(p)?;
+                self.opt_sp(p)?;
+                p.str(":")?;
+                self.opt_sp(p)?;
+                let stmt = self.statement(p)?;
+                Some(p.parsed(ast::Statement::labeled_statement(name, stmt)))
+            })
+        })
+    }
+    
+    pub fn try_statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::TryStatement, |p| {
+            p.parse(|p| {
+                p.str("try")?;
+                self.opt_sp(p)?;
+                let stmt = self.statement(p)?;
+                self.opt_sp(p)?;
+                let catch_clause = self.catch_clause(p);
+                self.opt_sp(p)?;
+                let finally_clause = self.finally_clause(p);
+                Some(p.parsed(ast::Statement::try_statement(stmt, catch_clause, finally_clause)))
+            })
+        })
+    }
+    
+    pub fn catch_clause(&self, p: &mut impl PegParser) -> Option<Parsed<ast::CatchClause>> {
+        p.for_rule(RuleName::TryStatement, |p| {
+            p.parse(|p| {
+                p.str("catch")?;
+                let name = p.parse(|p| {
+                    self.opt_sp(p)?;
+                    p.str("(")?;
+                    self.opt_sp(p)?;
+                    let name = self.identifier(p)?.value;
+                    self.opt_sp(p)?;
+                    p.str(")")?;
+                    Some(p.parsed(name))
+                });
+                self.opt_sp(p)?;
+                let stmt = self.block_statement(p)?;
+                Some(p.parsed(ast::CatchClause {name, stmt: Box::new(stmt)}))
+            })
+        })
+    }
+    
+    pub fn finally_clause(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
+        p.for_rule(RuleName::TryStatement, |p| {
+            p.parse(|p| {
+                p.str("finally")?;
+                self.opt_sp(p)?;
+                let stmt = self.block_statement(p)?;
+                Some(p.parsed(stmt.value))
             })
         })
     }
@@ -1033,6 +1079,9 @@ pub enum RuleName {
     FunctionDeclArg,
     FunctionDeclArgs,
     LabeledStatement,
+    TryStatement,
+    CatchClause,
+    FinallyClause,
 
     CommaExpression,
     AssignmentExpression,

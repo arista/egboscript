@@ -15,6 +15,7 @@ pub enum Statement {
     VarDeclStatement(VarDeclStatement),
     FunctionDeclStatement(FunctionDeclStatement),
     LabeledStatement(LabeledStatement),
+    TryStatement(TryStatement),
 }
 
 impl Statement {
@@ -102,6 +103,14 @@ impl Statement {
         Self::LabeledStatement(LabeledStatement {
             name,
             stmt: Box::new(stmt),
+        })
+    }
+
+    pub fn try_statement(stmt: Parsed<Statement>, catch_clause: Option<Parsed<CatchClause>>, finally_clause: Option<Parsed<Statement>>) -> Self {
+        Self::TryStatement(TryStatement {
+            stmt: Box::new(stmt),
+            catch_clause: catch_clause.map(|v| Box::new(v)),
+            finally_clause: finally_clause.map(|v| Box::new(v)),
         })
     }
 }
@@ -194,6 +203,19 @@ pub struct FunctionDeclArg {
 #[derive(Debug)]
 pub struct LabeledStatement {
     pub name: Parsed<String>,
+    pub stmt: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct TryStatement {
+    pub stmt: Box<Parsed<Statement>>,
+    pub catch_clause: Option<Box<Parsed<CatchClause>>>,
+    pub finally_clause: Option<Box<Parsed<Statement>>>,
+}
+
+#[derive(Debug)]
+pub struct CatchClause {
+    pub name: Option<Parsed<String>>,
     pub stmt: Box<Parsed<Statement>>,
 }
 
