@@ -38,10 +38,15 @@ pub struct Handle<'a, T> {
 
 pub enum Item {
     IntLiteral(IntLiteral),
+    BooleanLiteral(BooleanLiteral),
     StringLiteral(StringLiteral),
 }
 
 impl Item {
+    pub fn int_literal(id: Id, value: u32) -> Self {
+        Self::IntLiteral(IntLiteral {id, value})
+    }
+    
     pub fn as_int_literal(&self) -> ModelResult<&IntLiteral> {
         match self {
             Self::IntLiteral(r) => Ok(r),
@@ -49,10 +54,25 @@ impl Item {
         }
     }
 
+    pub fn string_literal(id: Id, value: String) -> Self {
+        Self::StringLiteral(StringLiteral {id, value})
+    }
+    
     pub fn as_string_literal(&self) -> ModelResult<&StringLiteral> {
         match self {
             Self::StringLiteral(r) => Ok(r),
-            _ => Err(ModelError::TypeMismatch("Item is not an StringLiteral"))
+            _ => Err(ModelError::TypeMismatch("Item is not a StringLiteral"))
+        }
+    }
+
+    pub fn boolean_literal(id: Id, value: bool) -> Self {
+        Self::BooleanLiteral(BooleanLiteral {id, value})
+    }
+    
+    pub fn as_boolean_literal(&self) -> ModelResult<&BooleanLiteral> {
+        match self {
+            Self::BooleanLiteral(r) => Ok(r),
+            _ => Err(ModelError::TypeMismatch("Item is not a BooleanLiteral"))
         }
     }
 }
@@ -71,6 +91,25 @@ impl<'a> Handle<'a, IntLiteral> {
     }
 
     pub fn value(&self) -> ModelResult<u32> {
+        Ok(self.item()?.value)
+    }
+}
+
+
+//----------------------------------------
+// BooleanLiteral
+
+pub struct BooleanLiteral {
+    pub id: Id,
+    pub value: bool,
+}
+
+impl<'a> Handle<'a, BooleanLiteral> {
+    pub fn item(&self) -> ModelResult<&BooleanLiteral> {
+        self.model.get_item(&self.id)?.as_boolean_literal()
+    }
+
+    pub fn value(&self) -> ModelResult<bool> {
         Ok(self.item()?.value)
     }
 }
