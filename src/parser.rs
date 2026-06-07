@@ -925,7 +925,8 @@ impl Parser {
                     Some(p.char_class(char_class)?.map_value(|v| DigitOrUnderscore::Digit(*v)))
                 }
             })?;
-            Some(ast::Expression::u32_literal(collect_digits(&first_and_rest(first, rest), radix), ast_radix))
+            let suffix = self.int_literal_suffix(p);
+            Some(ast::Expression::int_literal(collect_digits(&first_and_rest(first, rest), radix), ast_radix, suffix))
         })
     }
 
@@ -960,6 +961,21 @@ impl Parser {
             else if let Some(r) = self.binary_literal(p) {Some(r)}
             else if let Some(r) = self.decimal_literal(p) {Some(r)}
             else {None}
+        })
+    }
+
+    pub fn int_literal_suffix(&self, p: &mut impl PegParser) -> Option<Parsed<ast::IntLiteralSuffix>> {
+        p.for_rule(RuleName::IntLiteralSuffix, |p| {
+            self.op_str(p, &[
+                ("u64", ast::IntLiteralSuffix::U64),
+                ("u32", ast::IntLiteralSuffix::U32),
+                ("u16", ast::IntLiteralSuffix::U16),
+                ("u8", ast::IntLiteralSuffix::U8),
+                ("i64", ast::IntLiteralSuffix::I64),
+                ("i32", ast::IntLiteralSuffix::I32),
+                ("i16", ast::IntLiteralSuffix::I16),
+                ("i8", ast::IntLiteralSuffix::I8),
+            ])
         })
     }
 
@@ -1106,6 +1122,7 @@ pub enum RuleName {
     OctalLiteral,
     BinaryLiteral,
     IntLiteral,
+    IntLiteralSuffix,
 
     AddExpression,
     MultExpression,
@@ -1186,10 +1203,10 @@ fn first_and_rest<R>(first: Parsed<R>, rest: Parsed<Vec<Parsed<R>>>) -> Vec<Pars
 }
 
 // Collect digit characters into a single u32 parsed with the given radix, ignoring underscores
-fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u32 {
-    digits.iter().fold(0, |acc, v| {
+fn collect_digits(digits: &Vec<Parsed<DigitOrUnderscore>>, radix: u32) -> u64 {
+    digits.iter().fold(0u64, |acc, v| {
         match v.value {
-            DigitOrUnderscore::Digit(d) => (acc * radix) + d.to_digit(radix).unwrap(),
+            DigitOrUnderscore::Digit(d) => (acc * (radix as u64)) + (d.to_digit(radix).unwrap() as u64),
             _ => acc
         }
     })

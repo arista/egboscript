@@ -229,7 +229,7 @@ pub enum Expression {
     BooleanLiteral(bool),
     NullLiteral,
     StringLiteral(String),
-    U32Literal(U32Literal),
+    IntLiteral(IntLiteral),
     MemberExpression(MemberExpression),
     IdentifierExpression(IdentifierExpression),
 }
@@ -254,8 +254,8 @@ impl Expression {
         Self::StringLiteral(str)
     }
 
-    pub fn u32_literal(val: u32, radix: Radix) -> Self {
-        Self::U32Literal(U32Literal {val, radix})
+    pub fn int_literal(val: u64, radix: Radix, suffix: Option<Parsed<IntLiteralSuffix>>) -> Self {
+        Self::IntLiteral(IntLiteral {val, radix, suffix})
     }
 
     pub fn binary_expression(first: Parsed<Expression>, rest: Vec<Parsed<BinaryExpressionTerm>>) -> Self {
@@ -320,9 +320,22 @@ pub struct UnaryExpression {
 }
 
 #[derive(Debug)]
-pub struct U32Literal {
-    pub val: u32,
+pub struct IntLiteral {
+    pub val: u64,
     pub radix: Radix,
+    pub suffix: Option<Parsed<IntLiteralSuffix>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum IntLiteralSuffix {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
 }
 
 // The source radix of an int literal
