@@ -112,7 +112,7 @@ impl<T> ModelItems<T> {
 // SourceFiles and SourceLocations
 
 pub struct SourceFile {
-    name: String
+    pub name: String
 }
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
@@ -215,13 +215,11 @@ pub struct File {
 }
 
 #[derive(Debug)]
-// pub enum FileItem {
-//     ImportDecl(ItemPtr<ImportDecl>),
-//     TypeDecl(ItemPtr<TypeDecl>),
-//     Statement(ItemPtr<Statement>),
-// }
-
-pub struct FileItem {}
+pub enum FileItem {
+    ImportDecl(ItemPtr<ImportDecl>),
+    TypeDecl(ItemPtr<TypeDecl>),
+    Statement(ItemPtr<Statement>),
+}
 
 #[derive(Debug)]
 pub struct TypeDecl {
@@ -234,22 +232,23 @@ pub struct ImportDecl {
 }
 
 #[derive(Debug)]
-pub enum Statement {
-    EmptyStatement(ItemPtr<EmptyStatement>),
-    ExpressionStatement(ItemPtr<ExpressionStatement>),
-    IfStatement(ItemPtr<IfStatement>),
-    WhileStatement(ItemPtr<WhileStatement>),
-    ReturnStatement(ItemPtr<ReturnStatement>),
-    BreakStatement(ItemPtr<BreakStatement>),
-    ContinueStatement(ItemPtr<ContinueStatement>),
-    BlockStatement(ItemPtr<BlockStatement>),
-    ForStatement(ItemPtr<ForStatement>),
-    SwitchStatement(ItemPtr<SwitchStatement>),
-    VarDeclStatement(ItemPtr<VarDeclStatement>),
-    FunctionDeclStatement(ItemPtr<FunctionDeclStatement>),
-    LabeledStatement(ItemPtr<LabeledStatement>),
-    TryStatement(ItemPtr<TryStatement>),
-}
+// pub enum Statement {
+//     EmptyStatement(ItemPtr<EmptyStatement>),
+//     ExpressionStatement(ItemPtr<ExpressionStatement>),
+//     IfStatement(ItemPtr<IfStatement>),
+//     WhileStatement(ItemPtr<WhileStatement>),
+//     ReturnStatement(ItemPtr<ReturnStatement>),
+//     BreakStatement(ItemPtr<BreakStatement>),
+//     ContinueStatement(ItemPtr<ContinueStatement>),
+//     BlockStatement(ItemPtr<BlockStatement>),
+//     ForStatement(ItemPtr<ForStatement>),
+//     SwitchStatement(ItemPtr<SwitchStatement>),
+//     VarDeclStatement(ItemPtr<VarDeclStatement>),
+//     FunctionDeclStatement(ItemPtr<FunctionDeclStatement>),
+//     LabeledStatement(ItemPtr<LabeledStatement>),
+//     TryStatement(ItemPtr<TryStatement>),
+// }
+pub struct Statement {}
 
 #[derive(Debug)]
 pub struct EmptyStatement {
