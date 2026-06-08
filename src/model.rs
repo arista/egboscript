@@ -327,7 +327,8 @@ pub struct FunctionDeclStatement {
 
 #[derive(Debug)]
 pub struct LabeledStatement {
-    // FIXME - implement this
+    pub name: String,
+    pub stmt: ItemPtr<Statement>,
 }
 
 #[derive(Debug)]

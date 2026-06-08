@@ -195,9 +195,10 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_labeled_statement(&mut self, src: &ast::LabeledStatement, range: &ParsedRange) -> model::ItemPtr<model::LabeledStatement> {
-        self.build_item(src, range, |m| &mut m.labeled_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.labeled_statements, |v, mb| {
             model::LabeledStatement {
-                // FIXME - implement this
+                name: src.name.value.clone(),
+                stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
     }
