@@ -274,8 +274,8 @@ impl Expression {
         Self::StringLiteral(str)
     }
 
-    pub fn int_literal(val: u64, radix: Radix, suffix: Option<Parsed<IntLiteralSuffix>>) -> Self {
-        Self::IntLiteral(IntLiteral {val, radix, suffix})
+    pub fn int_literal(value: u64, radix: Radix, suffix: Option<Parsed<IntLiteralSuffix>>) -> Self {
+        Self::IntLiteral(IntLiteral {value, radix, suffix})
     }
 
     pub fn binary_expression(first: Parsed<Expression>, rest: Vec<Parsed<BinaryExpressionTerm>>) -> Self {
@@ -341,7 +341,7 @@ pub struct UnaryExpression {
 
 #[derive(Debug)]
 pub struct IntLiteral {
-    pub val: u64,
+    pub value: u64,
     pub radix: Radix,
     pub suffix: Option<Parsed<IntLiteralSuffix>>,
 }

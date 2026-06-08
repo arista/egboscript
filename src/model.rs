@@ -232,23 +232,22 @@ pub struct ImportDecl {
 }
 
 #[derive(Debug)]
-// pub enum Statement {
-//     EmptyStatement(ItemPtr<EmptyStatement>),
-//     ExpressionStatement(ItemPtr<ExpressionStatement>),
-//     IfStatement(ItemPtr<IfStatement>),
-//     WhileStatement(ItemPtr<WhileStatement>),
-//     ReturnStatement(ItemPtr<ReturnStatement>),
-//     BreakStatement(ItemPtr<BreakStatement>),
-//     ContinueStatement(ItemPtr<ContinueStatement>),
-//     BlockStatement(ItemPtr<BlockStatement>),
-//     ForStatement(ItemPtr<ForStatement>),
-//     SwitchStatement(ItemPtr<SwitchStatement>),
-//     VarDeclStatement(ItemPtr<VarDeclStatement>),
-//     FunctionDeclStatement(ItemPtr<FunctionDeclStatement>),
-//     LabeledStatement(ItemPtr<LabeledStatement>),
-//     TryStatement(ItemPtr<TryStatement>),
-// }
-pub struct Statement {}
+pub enum Statement {
+    EmptyStatement(ItemPtr<EmptyStatement>),
+    ExpressionStatement(ItemPtr<ExpressionStatement>),
+    IfStatement(ItemPtr<IfStatement>),
+    WhileStatement(ItemPtr<WhileStatement>),
+    ReturnStatement(ItemPtr<ReturnStatement>),
+    BreakStatement(ItemPtr<BreakStatement>),
+    ContinueStatement(ItemPtr<ContinueStatement>),
+    BlockStatement(ItemPtr<BlockStatement>),
+    ForStatement(ItemPtr<ForStatement>),
+    SwitchStatement(ItemPtr<SwitchStatement>),
+    VarDeclStatement(ItemPtr<VarDeclStatement>),
+    FunctionDeclStatement(ItemPtr<FunctionDeclStatement>),
+    LabeledStatement(ItemPtr<LabeledStatement>),
+    TryStatement(ItemPtr<TryStatement>),
+}
 
 #[derive(Debug)]
 pub struct EmptyStatement {
@@ -257,37 +256,40 @@ pub struct EmptyStatement {
 
 #[derive(Debug)]
 pub struct ExpressionStatement {
-    // FIXME - implement this
+    pub exp: ItemPtr<Expression>,
 }
 
 #[derive(Debug)]
 pub struct IfStatement {
-    // FIXME - implement this
+    pub test: ItemPtr<Expression>,
+    pub if_true: ItemPtr<Statement>,
+    pub if_false: Option<ItemPtr<Statement>>,
 }
 
 #[derive(Debug)]
 pub struct WhileStatement {
-    // FIXME - implement this
+    pub test: ItemPtr<Expression>,
+    pub stmt: ItemPtr<Statement>,
 }
 
 #[derive(Debug)]
 pub struct ReturnStatement {
-    // FIXME - implement this
+    pub exp: Option<ItemPtr<Expression>>,
 }
 
 #[derive(Debug)]
 pub struct BreakStatement {
-    // FIXME - implement this
+    pub label: Option<String>
 }
 
 #[derive(Debug)]
 pub struct ContinueStatement {
-    // FIXME - implement this
+    pub label: Option<String>
 }
 
 #[derive(Debug)]
 pub struct BlockStatement {
-    // FIXME - implement this
+    pub stmts: Vec<ItemPtr<Statement>>
 }
 
 #[derive(Debug)]
@@ -336,7 +338,7 @@ pub enum Expression {
 
 #[derive(Debug)]
 pub struct CommaExpression {
-    // FIXME - implement this
+    pub exps: Vec<ItemPtr<Expression>>
 }
 
 #[derive(Debug)]
@@ -356,22 +358,34 @@ pub struct UnaryExpression {
 
 #[derive(Debug)]
 pub struct BooleanLiteral {
-    // FIXME - implement this
+    pub value: bool
 }
 
 #[derive(Debug)]
 pub struct NullLiteral {
-    // FIXME - implement this
 }
 
 #[derive(Debug)]
 pub struct StringLiteral {
-    // FIXME - implement this
+    pub value: String
 }
 
 #[derive(Debug)]
 pub struct IntLiteral {
-    // FIXME - implement this
+    pub value: u64,
+    pub suffix: Option<IntLiteralSuffix>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum IntLiteralSuffix {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
 }
 
 #[derive(Debug)]
@@ -381,160 +395,5 @@ pub struct MemberExpression {
 
 #[derive(Debug)]
 pub struct IdentifierExpression {
-    // FIXME - implement this
+    pub name: String
 }
-
-
-
-
-
-
-
-
-
-
-
-// #[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
-// pub struct IntLiteral {
-//     value: u32,
-// }
-
-// #[derive(Eq, Hash, PartialEq, Clone, Copy)]
-// pub struct Id {
-//     pub id: u32
-// }
-
-// pub struct Handle<'a, T> {
-//     pub model: &'a Model,
-//     pub id: Id,
-
-//     // To allow the <T> even if it hasn't been used yet in a field
-//     _marker: PhantomData<T>,
-// }
-
-// pub enum Item {
-//     IntLiteral(IntLiteral),
-//     BooleanLiteral(BooleanLiteral),
-//     StringLiteral(StringLiteral),
-//     NullLiteral(NullLiteral),
-// }
-
-// pub enum Expression {
-//     IntLiteral(IntLiteral),
-//     BooleanLiteral(BooleanLiteral),
-//     StringLiteral(StringLiteral),
-//     NullLiteral(NullLiteral),
-// }
-
-// impl Item {
-//     pub fn int_literal(id: Id, value: u32) -> Self {
-//         Self::IntLiteral(IntLiteral {id, value})
-//     }
-    
-//     pub fn as_int_literal(&self) -> ModelResult<&IntLiteral> {
-//         match self {
-//             Self::IntLiteral(r) => Ok(r),
-//             _ => Err(ModelError::TypeMismatch("Item is not an IntLiteral"))
-//         }
-//     }
-
-//     pub fn string_literal(id: Id, value: String) -> Self {
-//         Self::StringLiteral(StringLiteral {id, value})
-//     }
-    
-//     pub fn as_string_literal(&self) -> ModelResult<&StringLiteral> {
-//         match self {
-//             Self::StringLiteral(r) => Ok(r),
-//             _ => Err(ModelError::TypeMismatch("Item is not a StringLiteral"))
-//         }
-//     }
-
-//     pub fn boolean_literal(id: Id, value: bool) -> Self {
-//         Self::BooleanLiteral(BooleanLiteral {id, value})
-//     }
-    
-//     pub fn as_boolean_literal(&self) -> ModelResult<&BooleanLiteral> {
-//         match self {
-//             Self::BooleanLiteral(r) => Ok(r),
-//             _ => Err(ModelError::TypeMismatch("Item is not a BooleanLiteral"))
-//         }
-//     }
-
-//     pub fn null_literal(id: Id) -> Self {
-//         Self::NullLiteral(NullLiteral {id})
-//     }
-    
-//     pub fn as_null_literal(&self) -> ModelResult<&NullLiteral> {
-//         match self {
-//             Self::NullLiteral(r) => Ok(r),
-//             _ => Err(ModelError::TypeMismatch("Item is not a NullLiteral"))
-//         }
-//     }
-// }
-
-// //----------------------------------------
-// // NullLiteral
-
-// pub struct NullLiteral {
-//     pub id: Id,
-// }
-
-// impl<'a> Handle<'a, NullLiteral> {
-//     pub fn item(&self) -> ModelResult<&NullLiteral> {
-//         self.model.get_item(&self.id)?.as_null_literal()
-//     }
-// }
-
-// //----------------------------------------
-// // IntLiteral
-
-// pub struct IntLiteral {
-//     pub id: Id,
-//     pub value: u32,
-// }
-
-// impl<'a> Handle<'a, IntLiteral> {
-//     pub fn item(&self) -> ModelResult<&IntLiteral> {
-//         self.model.get_item(&self.id)?.as_int_literal()
-//     }
-
-//     pub fn value(&self) -> ModelResult<u32> {
-//         Ok(self.item()?.value)
-//     }
-// }
-
-// //----------------------------------------
-// // BooleanLiteral
-
-// pub struct BooleanLiteral {
-//     pub id: Id,
-//     pub value: bool,
-// }
-
-// impl<'a> Handle<'a, BooleanLiteral> {
-//     pub fn item(&self) -> ModelResult<&BooleanLiteral> {
-//         self.model.get_item(&self.id)?.as_boolean_literal()
-//     }
-
-//     pub fn value(&self) -> ModelResult<bool> {
-//         Ok(self.item()?.value)
-//     }
-// }
-
-// //----------------------------------------
-// // StringLiteral
-
-// pub struct StringLiteral {
-//     pub id: Id,
-//     pub value: String,
-// }
-
-// impl<'a> Handle<'a, StringLiteral> {
-//     pub fn item(&self) -> ModelResult<&StringLiteral> {
-//         self.model.get_item(&self.id)?.as_string_literal()
-//     }
-
-//     pub fn value(&self) -> ModelResult<&String> {
-//         Ok(&self.item()?.value)
-//     }
-// }
