@@ -1,4 +1,4 @@
-use std::{marker::PhantomData};
+use std::{collections::HashMap, marker::PhantomData};
 
 pub enum ModelError {
     TypeMismatch(&'static str)
@@ -7,6 +7,10 @@ pub enum ModelError {
 pub type ModelResult<T> = Result<T, ModelError>;
 
 pub struct Model {
+    pub source_files: SourceFiles,
+    pub span_table: HashMap<ItemKey, SourceLocation>,
+
+    // Dense arrays of each item type, including polymorphic enum types (Statement, Expression, etc.)
     pub files: ModelItems<File>,
     pub file_items: ModelItems<FileItem>,
     pub type_decls: ModelItems<TypeDecl>,
@@ -42,6 +46,9 @@ pub struct Model {
 impl Model {
     pub fn new() -> Self {
         Self {
+            source_files: SourceFiles::new(),
+            span_table: HashMap::new(),
+            
             files: ModelItems::new(ItemKind::File),
             file_items: ModelItems::new(ItemKind::FileItem),
             type_decls: ModelItems::new(ItemKind::TypeDecl),
@@ -101,6 +108,52 @@ impl<T> ModelItems<T> {
     }
 }
 
+//--------------------------------------------------
+// SourceFiles and SourceLocations
+
+pub struct SourceFile {
+    name: String
+}
+
+#[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
+pub struct SourceFilePtr {
+    id: usize
+}
+
+pub struct SourceFiles {
+    source_files: HashMap<SourceFilePtr, SourceFile>,
+    id_counter: usize
+}
+
+impl SourceFiles {
+    pub fn new() -> Self {
+        Self {
+            source_files: HashMap::new(),
+            id_counter: 1,
+        }
+    }
+
+    pub fn add(&mut self, name: String) -> SourceFilePtr {
+        let ret = SourceFilePtr {id: self.id_counter};
+        self.source_files.insert(ret, SourceFile {
+            name
+        });
+        ret
+    }
+}
+
+pub struct SourceLocation {
+    pub source_file: SourceFilePtr,
+    pub span: Span,
+}
+
+pub struct Span {
+    // The position of the first character
+    pub start: usize,
+    // The position *after* the last character
+    pub end: usize,
+}
+
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
 pub enum ItemKind {
@@ -143,17 +196,32 @@ pub struct ItemPtr<T> {
     _marker: PhantomData<T>,
 }
 
+impl<T> ItemPtr<T> {
+    pub fn key(&self) -> ItemKey {
+        ItemKey {kind: self.kind, id: self.id}
+    }
+}
+
+// Type-erased version of a ptr, for use in tables
+#[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
+pub struct ItemKey {
+    kind: ItemKind,
+    id: usize,
+}
+
 #[derive(Debug)]
 pub struct File {
     pub items: Vec<ItemPtr<FileItem>>
 }
 
 #[derive(Debug)]
-pub enum FileItem {
-    ImportDecl(ItemPtr<ImportDecl>),
-    TypeDecl(ItemPtr<TypeDecl>),
-    Statement(ItemPtr<Statement>),
-}
+// pub enum FileItem {
+//     ImportDecl(ItemPtr<ImportDecl>),
+//     TypeDecl(ItemPtr<TypeDecl>),
+//     Statement(ItemPtr<Statement>),
+// }
+
+pub struct FileItem {}
 
 #[derive(Debug)]
 pub struct TypeDecl {
@@ -182,7 +250,6 @@ pub enum Statement {
     LabeledStatement(ItemPtr<LabeledStatement>),
     TryStatement(ItemPtr<TryStatement>),
 }
-
 
 #[derive(Debug)]
 pub struct EmptyStatement {

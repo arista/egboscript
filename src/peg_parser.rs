@@ -274,9 +274,9 @@ impl<R> Parsed<R> {
 #[derive(Copy, Clone, Debug, PartialOrd, Ord, PartialEq, Eq)]
 pub struct ParsedRange {
     // The position of the first character
-    start: usize,
+    pub start: usize,
     // The position *after* the last character
-    end: usize,
+    pub end: usize,
 }
 
 // Represents a set of characters and character ranges to be matched (or not matched if negated is true)
