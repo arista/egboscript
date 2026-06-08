@@ -1,6 +1,26 @@
 use crate::peg_parser::Parsed;
 
 #[derive(Debug)]
+pub struct File {
+    pub items: Vec<Parsed<FileItem>>
+}
+
+#[derive(Debug)]
+pub enum FileItem {
+    Statement(Statement),
+    TypeDecl(TypeDecl),
+    ImportDecl(ImportDecl),
+}
+
+#[derive(Debug)]
+pub struct TypeDecl {
+}
+
+#[derive(Debug)]
+pub struct ImportDecl {
+}
+
+#[derive(Debug)]
 pub enum Statement {
     EmptyStatement,
     ExpressionStatement(ExpressionStatement),

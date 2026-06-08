@@ -12,6 +12,45 @@ impl Parser {
         Self {}
     }
 
+    pub fn file(&self, p: &mut impl PegParser) -> Option<Parsed<ast::File>> {
+        p.for_rule(RuleName::File, |p| {
+            p.parse(|p| {
+                let items = p.star(|p| self.file_item(p))?.value;
+                Some(p.parsed(ast::File {items}))
+            })
+        })
+    }
+
+    pub fn file_item(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FileItem>> {
+        p.for_rule(RuleName::FileItem, |p| {
+            if let Some(r) = self.statement_file_item(p) {Some(r)}
+            else if let Some(r) = self.type_decl(p) {Some(r)}
+            else if let Some(r) = self.import_decl(p) {Some(r)}
+            else {None}
+        })
+    }
+
+    pub fn statement_file_item(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FileItem>> {
+        p.for_rule(RuleName::StatementFileItem, |p| {
+            let statement = self.statement(p)?.value;
+            Some(p.parsed(ast::FileItem::Statement(statement)))
+        })
+    }
+
+    pub fn type_decl(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FileItem>> {
+        p.for_rule(RuleName::TypeDecl, |_p| {
+            // FIXME - implement this
+            None
+        })
+    }
+
+    pub fn import_decl(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FileItem>> {
+        p.for_rule(RuleName::ImportDecl, |_p| {
+            // FIXME - implement this
+            None
+        })
+    }
+
     pub fn statement(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
         p.for_rule(RuleName::Statement, |p| {
             p.parse(|p| {
@@ -1078,6 +1117,12 @@ impl Parser {
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum RuleName {
+    File,
+    FileItem,
+    StatementFileItem,
+    TypeDecl,
+    ImportDecl,
+
     Statement,
     EmptyStatement,
     ExpressionStatement,
