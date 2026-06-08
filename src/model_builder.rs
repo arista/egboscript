@@ -251,14 +251,44 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_unary_expression(&mut self, src: &ast::UnaryExpression, range: &ParsedRange) -> model::ItemPtr<model::UnaryExpression> {
-        self.build_item(src, range, |m| &mut m.unary_expressions, |_v, _mb| {
-            model::UnaryExpression {
-                // FIXME - implement this
+    pub fn build_unary_expression(&mut self, src: &ast::UnaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::UnaryExpression> {
+        let exp = self.build_expression(&src.exp.value, &src.exp.range);
+        self.build_one_unary_expression(&src.ops, 0, &exp)
+    }
+            
+    fn build_one_unary_expression(&mut self, ops: &Vec<Parsed<ast::UnaryOp>>, ix: usize, exp: &model::ItemPtr<model::Expression>) -> model::ItemPtr<model::UnaryExpression> {
+        let op = ops.get(ix).unwrap();
+        let model_op = self.build_unary_op(&op.value);
+        self.build_item(&(), &op.range, |m| &mut m.unary_expressions, |_v, mb| {
+            if ix == ops.len() - 1 {
+                model::UnaryExpression {
+                    op: model_op,
+                    exp: *exp,
+                }
+            }
+            else {
+                let e = mb.build_one_unary_expression(ops, ix + 1, exp);
+                // Build an Expression around the UnaryExpression
+                let eexp = mb.build_item(&e, &op.range, |m| &mut m.expressions, |v, _mb| {
+                    model::Expression::UnaryExpression(v.clone())
+                });
+                model::UnaryExpression {
+                    op: model_op,
+                    exp: eexp,
+                }
             }
         })
     }
-            
+
+    pub fn build_unary_op(&mut self, src: &ast::UnaryOp) -> model::UnaryOp {
+        match src {
+            ast::UnaryOp::Plus => model::UnaryOp::Plus,
+            ast::UnaryOp::Minus => model::UnaryOp::Minus,
+            ast::UnaryOp::LogicalNot => model::UnaryOp::LogicalNot,
+            ast::UnaryOp::BitwiseNot => model::UnaryOp::BitwiseNot,
+        }
+    }
+    
     pub fn build_boolean_literal(&mut self, src: &bool, range: &ParsedRange) -> model::ItemPtr<model::BooleanLiteral> {
         self.build_item(src, range, |m| &mut m.boolean_literals, |v, _mb| {
             model::BooleanLiteral {

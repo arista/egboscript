@@ -189,12 +189,22 @@ pub enum ItemKind {
     IdentifierExpression,
 }
 
-#[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, Hash, PartialEq)]
 pub struct ItemPtr<T> {
     kind: ItemKind,
     id: usize,
     _marker: PhantomData<T>,
 }
+
+// Implement Clone and Copy manually (derive is too conservative about requiring T to also be Clone and Copy)
+impl<T> Clone for ItemPtr<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
+impl<T> Copy for ItemPtr<T> {}
+
 
 impl<T> ItemPtr<T> {
     pub fn key(&self) -> ItemKey {
@@ -353,7 +363,16 @@ pub struct BinaryExpression {
 
 #[derive(Debug)]
 pub struct UnaryExpression {
-    // FIXME - implement this
+    pub op: UnaryOp,
+    pub exp: ItemPtr<Expression>
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum UnaryOp {
+    Plus,
+    Minus,
+    LogicalNot,
+    BitwiseNot,
 }
 
 #[derive(Debug)]
