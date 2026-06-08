@@ -203,9 +203,20 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_try_statement(&mut self, src: &ast::TryStatement, range: &ParsedRange) -> model::ItemPtr<model::TryStatement> {
-        self.build_item(src, range, |m| &mut m.try_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.try_statements, |v, mb| {
             model::TryStatement {
-                // FIXME - implement this
+                stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
+                catch_clause: v.catch_clause.as_ref().map(|v| mb.build_catch_clause(&v.value, &v.range)),
+                finally_clause: v.finally_clause.as_ref().map(|v| mb.build_statement(&v.value, &v.range)),
+            }
+        })
+    }
+            
+    pub fn build_catch_clause(&mut self, src: &ast::CatchClause, range: &ParsedRange) -> model::ItemPtr<model::CatchClause> {
+        self.build_item(src, range, |m| &mut m.catch_clauses, |v, mb| {
+            model::CatchClause {
+                name: src.name.as_ref().map(|v| v.value.clone()),
+                stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
     }

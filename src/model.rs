@@ -30,6 +30,7 @@ pub struct Model {
     pub function_decl_statements: ModelItems<FunctionDeclStatement>,
     pub labeled_statements: ModelItems<LabeledStatement>,
     pub try_statements: ModelItems<TryStatement>,
+    pub catch_clauses: ModelItems<CatchClause>,
     pub expressions: ModelItems<Expression>,
     pub comma_expressions: ModelItems<CommaExpression>,
     pub ternary_expressions: ModelItems<TernaryExpression>,
@@ -68,6 +69,7 @@ impl Model {
             function_decl_statements: ModelItems::new(ItemKind::FunctionDeclStatement),
             labeled_statements: ModelItems::new(ItemKind::LabeledStatement),
             try_statements: ModelItems::new(ItemKind::TryStatement),
+            catch_clauses: ModelItems::new(ItemKind::CatchClause),
             expressions: ModelItems::new(ItemKind::Expression),
             comma_expressions: ModelItems::new(ItemKind::CommaExpression),
             ternary_expressions: ModelItems::new(ItemKind::TernaryExpression),
@@ -176,6 +178,7 @@ pub enum ItemKind {
     FunctionDeclStatement,
     LabeledStatement,
     TryStatement,
+    CatchClause,
     Expression,
     CommaExpression,
     TernaryExpression,
@@ -329,7 +332,15 @@ pub struct LabeledStatement {
 
 #[derive(Debug)]
 pub struct TryStatement {
-    // FIXME - implement this
+    pub stmt: ItemPtr<Statement>,
+    pub catch_clause: Option<ItemPtr<CatchClause>>,
+    pub finally_clause: Option<ItemPtr<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct CatchClause {
+    pub name: Option<String>,
+    pub stmt: ItemPtr<Statement>,
 }
 
 #[derive(Debug)]
