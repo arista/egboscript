@@ -26,6 +26,8 @@ pub struct Model {
     pub switch_statements: ModelItems<SwitchStatement>,
     pub var_decl_statements: ModelItems<VarDeclStatement>,
     pub function_decl_statements: ModelItems<FunctionDeclStatement>,
+    pub function_signatures: ModelItems<FunctionSignature>,
+    pub function_decl_args: ModelItems<FunctionDeclArg>,
     pub labeled_statements: ModelItems<LabeledStatement>,
     pub try_statements: ModelItems<TryStatement>,
     pub catch_clauses: ModelItems<CatchClause>,
@@ -62,6 +64,8 @@ impl Model {
             switch_statements: ModelItems::new(ItemKind::SwitchStatement),
             var_decl_statements: ModelItems::new(ItemKind::VarDeclStatement),
             function_decl_statements: ModelItems::new(ItemKind::FunctionDeclStatement),
+            function_signatures: ModelItems::new(ItemKind::FunctionSignature),
+            function_decl_args: ModelItems::new(ItemKind::FunctionDeclArg),
             labeled_statements: ModelItems::new(ItemKind::LabeledStatement),
             try_statements: ModelItems::new(ItemKind::TryStatement),
             catch_clauses: ModelItems::new(ItemKind::CatchClause),
@@ -170,6 +174,8 @@ pub enum ItemKind {
     SwitchStatement,
     VarDeclStatement,
     FunctionDeclStatement,
+    FunctionSignature,
+    FunctionDeclArg,
     LabeledStatement,
     TryStatement,
     CatchClause,
@@ -323,7 +329,19 @@ pub enum LetOrConst {
 
 #[derive(Debug)]
 pub struct FunctionDeclStatement {
-    // FIXME - implement this
+    pub name: String,
+    pub signature: ItemPtr<FunctionSignature>,
+    pub body: Statement,
+}
+
+#[derive(Debug)]
+pub struct FunctionSignature {
+    pub args: Vec<ItemPtr<FunctionDeclArg>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionDeclArg {
+    pub name: String
 }
 
 #[derive(Debug)]

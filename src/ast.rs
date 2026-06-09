@@ -112,10 +112,10 @@ impl Statement {
         })
     }
 
-    pub fn function_decl_statement(name: Parsed<String>, args: Parsed<Vec<Parsed<FunctionDeclArg>>>, body: Parsed<Statement>) -> Self {
+    pub fn function_decl_statement(name: Parsed<String>, signature: Parsed<FunctionSignature>, body: Parsed<Statement>) -> Self {
         Self::FunctionDeclStatement(FunctionDeclStatement {
             name,
-            args,
+            signature,
             body: Box::new(body),
         })
     }
@@ -211,9 +211,14 @@ pub struct VarDeclStatement {
 #[derive(Debug)]
 pub struct FunctionDeclStatement {
     pub name: Parsed<String>,
+    pub signature: Parsed<FunctionSignature>,
+    pub body: Box<Parsed<Statement>>,
+}
+
+#[derive(Debug)]
+pub struct FunctionSignature {
     pub args: Parsed<Vec<Parsed<FunctionDeclArg>>>,
     // FIXME - add return type
-    pub body: Box<Parsed<Statement>>,
 }
 
 #[derive(Debug)]

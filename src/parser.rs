@@ -308,6 +308,17 @@ impl Parser {
                 self.opt_sp(p)?;
                 let name = self.identifier(p)?;
                 self.opt_sp(p)?;
+                let signature = self.function_signature(p)?;
+                self.opt_sp(p)?;
+                let stmt = self.block_statement(p)?;
+                Some(p.parsed(ast::Statement::function_decl_statement(name, signature, stmt)))
+            })
+        })
+    }
+    
+    pub fn function_signature(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FunctionSignature>> {
+        p.for_rule(RuleName::FunctionSignature, |p| {
+            p.parse(|p| {
                 p.str("(")?;
                 let args = self.function_decl_args(p)?;
                 self.opt_sp(p)?;
@@ -318,8 +329,8 @@ impl Parser {
                 })?;
                 p.str(")")?;
                 self.opt_sp(p)?;
-                let stmt = self.block_statement(p)?;
-                Some(p.parsed(ast::Statement::function_decl_statement(name, args, stmt)))
+                // FIXME - add return type
+                Some(p.parsed(ast::FunctionSignature {args}))
             })
         })
     }
@@ -1148,6 +1159,7 @@ pub enum RuleName {
     VarDeclStatement,
     LetOrConst,
     FunctionDeclStatement,
+    FunctionSignature,
     FunctionDeclArg,
     FunctionDeclArgs,
     LabeledStatement,

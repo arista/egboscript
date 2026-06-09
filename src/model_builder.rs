@@ -192,9 +192,27 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_function_decl_statement(&mut self, src: &ast::FunctionDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclStatement> {
-        self.build_item(src, range, |m| &mut m.function_decl_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.function_decl_statements, |v, mb| {
             model::FunctionDeclStatement {
-                // FIXME - implement this
+                name: v.name.value.clone(),
+                signature: mb.build_function_signature(&v.signature.value, &v.signature.range),
+                body: mb.build_statement(&v.body.value, &v.body.range),
+            }
+        })
+    }
+            
+    pub fn build_function_signature(&mut self, src: &ast::FunctionSignature, range: &ParsedRange) -> model::ItemPtr<model::FunctionSignature> {
+        self.build_item(src, range, |m| &mut m.function_signatures, |v, mb| {
+            model::FunctionSignature {
+                args: v.args.value.iter().map(|v| mb.build_function_decl_arg(&v.value, &v.range)).collect(),
+            }
+        })
+    }
+            
+    pub fn build_function_decl_arg(&mut self, src: &ast::FunctionDeclArg, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclArg> {
+        self.build_item(src, range, |m| &mut m.function_decl_args, |v, _mb| {
+            model::FunctionDeclArg {
+                name: v.name.value.clone(),
             }
         })
     }
