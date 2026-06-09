@@ -259,7 +259,8 @@ pub struct TypeDecl {
 
 #[derive(Debug)]
 pub struct ImportDecl {
-    // FIXME - implement this
+    pub name: String,
+    pub source: String,
 }
 
 #[derive(Debug, Copy, Clone)]

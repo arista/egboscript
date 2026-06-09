@@ -85,9 +85,10 @@ impl<'a> ModelBuilder<'a> {
     }
     
     pub fn build_import_decl(&mut self, src: &ast::ImportDecl, range: &ParsedRange) -> model::ItemPtr<model::ImportDecl> {
-        self.build_item(src, range, |m| &mut m.import_decls, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.import_decls, |v, _mb| {
             model::ImportDecl {
-                // FIXME - implement this
+                name: v.name.value.clone(),
+                source: v.source.value.clone(),
             }
         })
     }

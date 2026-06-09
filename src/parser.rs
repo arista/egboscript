@@ -45,9 +45,23 @@ impl Parser {
     }
 
     pub fn import_decl(&self, p: &mut impl PegParser) -> Option<Parsed<ast::FileItem>> {
-        p.for_rule(RuleName::ImportDecl, |_p| {
-            // FIXME - implement this
-            None
+        p.for_rule(RuleName::ImportDecl, |p| {
+            p.str("import")?;
+            self.opt_sp(p)?;
+            p.str("*")?;
+            self.opt_sp(p)?;
+            p.str("as")?;
+            self.opt_sp(p)?;
+            let name = self.identifier(p)?;
+            self.opt_sp(p)?;
+            p.str("from")?;
+            self.opt_sp(p)?;
+            self.statement_end(p)?;
+            let source = self.string_literal(p)?;
+            Some(p.parsed(ast::FileItem::ImportDecl(ast::ImportDecl {
+                name,
+                source,
+            })))
         })
     }
 
@@ -819,7 +833,7 @@ impl Parser {
             if let Some(r) = self.boolean_literal(p) {Some(r)}
             else if let Some(r) = self.int_literal(p) {Some(r)}
             else if let Some(r) = self.null_literal(p) {Some(r)}
-            else if let Some(r) = self.string_literal(p) {Some(r)}
+            else if let Some(r) = self.string_literal_expression(p) {Some(r)}
             // FIXME - add string template
             else {None}
         })
@@ -862,7 +876,17 @@ impl Parser {
         })
     }
 
-    pub fn string_literal(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+    pub fn string_literal_expression(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Expression>> {
+        p.for_rule(RuleName::StringLiteralExpression, |p| {
+            let r = self.string_literal(p)?;
+            Some(Parsed {
+                range: r.range,
+                value: ast::Expression::StringLiteral(r.value),
+            })
+        })
+    }
+
+    pub fn string_literal(&self, p: &mut impl PegParser) -> Option<Parsed<String>> {
         p.for_rule(RuleName::StringLiteral, |p| {
             if let Some(r) = self.string_literal_for_delimiter(p, '\'') {Some(r)}
             else if let Some(r) = self.string_literal_for_delimiter(p, '\"') {Some(r)}
@@ -870,14 +894,14 @@ impl Parser {
         })
     }
 
-    pub fn string_literal_for_delimiter(&self, p: &mut impl PegParser, delimiter: char) -> Option<Parsed<ast::Expression>> {
+    pub fn string_literal_for_delimiter(&self, p: &mut impl PegParser, delimiter: char) -> Option<Parsed<String>> {
         p.ch(delimiter)?;
         let chars = p.star(|p| self.string_literal_char(p, delimiter))?.value;
         p.ch(delimiter)?;
 
         // Unwrap the chars, remove any that are line continuations ("\" followed by line break), collect to string
         let value = chars.into_iter().map(|v| v.value.to_char()).flatten().collect();
-        Some(p.parsed(ast::Expression::string_literal(value)))
+        Some(p.parsed(value))
     }
 
     pub fn string_literal_char(&self, p: &mut impl PegParser, delimiter: char) -> Option<Parsed<CharOrLineBreak>> {
@@ -1183,6 +1207,7 @@ pub enum RuleName {
     ReservedWord,
     BooleanLiteral,
     NullLiteral,
+    StringLiteralExpression,
     StringLiteral,
     StringLiteralChar,
     DecimalLiteral,

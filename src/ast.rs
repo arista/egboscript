@@ -18,6 +18,8 @@ pub struct TypeDecl {
 
 #[derive(Debug)]
 pub struct ImportDecl {
+    pub name: Parsed<String>,
+    pub source: Parsed<String>,
 }
 
 #[derive(Debug)]
