@@ -15,7 +15,12 @@ impl Parser {
     pub fn file(&self, p: &mut impl PegParser) -> Option<Parsed<ast::File>> {
         p.for_rule(RuleName::File, |p| {
             p.parse(|p| {
-                let items = p.star(|p| self.file_item(p))?.value;
+                let items = p.star(|p| {
+                    self.opt_sp(p)?;
+                    self.file_item(p)
+                })?.value;
+                self.opt_sp(p)?;
+                p.eof()?;
                 Some(p.parsed(ast::File {items}))
             })
         })
@@ -56,8 +61,8 @@ impl Parser {
             self.opt_sp(p)?;
             p.str("from")?;
             self.opt_sp(p)?;
-            self.statement_end(p)?;
             let source = self.string_literal(p)?;
+            self.statement_end(p)?;
             Some(p.parsed(ast::FileItem::ImportDecl(ast::ImportDecl {
                 name,
                 source,
