@@ -10,12 +10,11 @@ pub struct Model {
     pub source_files: SourceFiles,
     pub span_table: HashMap<ItemKey, SourceLocation>,
 
-    // Dense arrays of each item type, including polymorphic enum types (Statement, Expression, etc.)
+    // Dense arrays of each item type
     pub files: ModelItems<File>,
     pub file_items: ModelItems<FileItem>,
     pub type_decls: ModelItems<TypeDecl>,
     pub import_decls: ModelItems<ImportDecl>,
-    pub statements: ModelItems<Statement>,
     pub empty_statements: ModelItems<EmptyStatement>,
     pub expression_statements: ModelItems<ExpressionStatement>,
     pub if_statements: ModelItems<IfStatement>,
@@ -54,7 +53,6 @@ impl Model {
             file_items: ModelItems::new(ItemKind::FileItem),
             type_decls: ModelItems::new(ItemKind::TypeDecl),
             import_decls: ModelItems::new(ItemKind::ImportDecl),
-            statements: ModelItems::new(ItemKind::Statement),
             empty_statements: ModelItems::new(ItemKind::EmptyStatement),
             expression_statements: ModelItems::new(ItemKind::ExpressionStatement),
             if_statements: ModelItems::new(ItemKind::IfStatement),
@@ -231,7 +229,7 @@ pub struct File {
 pub enum FileItem {
     ImportDecl(ItemPtr<ImportDecl>),
     TypeDecl(ItemPtr<TypeDecl>),
-    Statement(ItemPtr<Statement>),
+    Statement(Statement),
 }
 
 #[derive(Debug)]
@@ -275,14 +273,14 @@ pub struct ExpressionStatement {
 #[derive(Debug)]
 pub struct IfStatement {
     pub test: ItemPtr<Expression>,
-    pub if_true: ItemPtr<Statement>,
-    pub if_false: Option<ItemPtr<Statement>>,
+    pub if_true: Statement,
+    pub if_false: Option<Statement>,
 }
 
 #[derive(Debug)]
 pub struct WhileStatement {
     pub test: ItemPtr<Expression>,
-    pub stmt: ItemPtr<Statement>,
+    pub stmt: Statement,
 }
 
 #[derive(Debug)]
@@ -302,7 +300,7 @@ pub struct ContinueStatement {
 
 #[derive(Debug)]
 pub struct BlockStatement {
-    pub stmts: Vec<ItemPtr<Statement>>
+    pub stmts: Vec<Statement>
 }
 
 #[derive(Debug)]
@@ -328,20 +326,20 @@ pub struct FunctionDeclStatement {
 #[derive(Debug)]
 pub struct LabeledStatement {
     pub name: String,
-    pub stmt: ItemPtr<Statement>,
+    pub stmt: Statement,
 }
 
 #[derive(Debug)]
 pub struct TryStatement {
-    pub stmt: ItemPtr<Statement>,
+    pub stmt: Statement,
     pub catch_clause: Option<ItemPtr<CatchClause>>,
-    pub finally_clause: Option<ItemPtr<Statement>>,
+    pub finally_clause: Option<Statement>,
 }
 
 #[derive(Debug)]
 pub struct CatchClause {
     pub name: Option<String>,
-    pub stmt: ItemPtr<Statement>,
+    pub stmt: Statement,
 }
 
 #[derive(Debug)]

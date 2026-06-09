@@ -59,25 +59,23 @@ impl<'a> ModelBuilder<'a> {
         })
     }
     
-    pub fn build_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::ItemPtr<model::Statement> {
-        self.build_item(src, range, |m| &mut m.statements, |v, mb| {
-            match v {
-                ast::Statement::EmptyStatement => model::Statement::EmptyStatement(mb.build_empty_statement(range)),
-                ast::Statement::ExpressionStatement(a) => model::Statement::ExpressionStatement(mb.build_expression_statement(a, range)),
-                ast::Statement::IfStatement(a) => model::Statement::IfStatement(mb.build_if_statement(a, range)),
-                ast::Statement::WhileStatement(a) => model::Statement::WhileStatement(mb.build_while_statement(a, range)),
-                ast::Statement::ReturnStatement(a) => model::Statement::ReturnStatement(mb.build_return_statement(a, range)),
-                ast::Statement::BreakStatement(a) => model::Statement::BreakStatement(mb.build_break_statement(a, range)),
-                ast::Statement::ContinueStatement(a) => model::Statement::ContinueStatement(mb.build_continue_statement(a, range)),
-                ast::Statement::BlockStatement(a) => model::Statement::BlockStatement(mb.build_block_statement(a, range)),
-                ast::Statement::ForStatement(a) => model::Statement::ForStatement(mb.build_for_statement(a, range)),
-                ast::Statement::SwitchStatement(a) => model::Statement::SwitchStatement(mb.build_switch_statement(a, range)),
-                ast::Statement::VarDeclStatement(a) => model::Statement::VarDeclStatement(mb.build_var_decl_statement(a, range)),
-                ast::Statement::FunctionDeclStatement(a) => model::Statement::FunctionDeclStatement(mb.build_function_decl_statement(a, range)),
-                ast::Statement::LabeledStatement(a) => model::Statement::LabeledStatement(mb.build_labeled_statement(a, range)),
-                ast::Statement::TryStatement(a) => model::Statement::TryStatement(mb.build_try_statement(a, range)),
-            }
-        })
+    pub fn build_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::Statement {
+        match src {
+            ast::Statement::EmptyStatement => model::Statement::EmptyStatement(self.build_empty_statement(range)),
+            ast::Statement::ExpressionStatement(a) => model::Statement::ExpressionStatement(self.build_expression_statement(&a, range)),
+            ast::Statement::IfStatement(a) => model::Statement::IfStatement(self.build_if_statement(&a, range)),
+            ast::Statement::WhileStatement(a) => model::Statement::WhileStatement(self.build_while_statement(&a, range)),
+            ast::Statement::ReturnStatement(a) => model::Statement::ReturnStatement(self.build_return_statement(&a, range)),
+            ast::Statement::BreakStatement(a) => model::Statement::BreakStatement(self.build_break_statement(&a, range)),
+            ast::Statement::ContinueStatement(a) => model::Statement::ContinueStatement(self.build_continue_statement(&a, range)),
+            ast::Statement::BlockStatement(a) => model::Statement::BlockStatement(self.build_block_statement(&a, range)),
+            ast::Statement::ForStatement(a) => model::Statement::ForStatement(self.build_for_statement(&a, range)),
+            ast::Statement::SwitchStatement(a) => model::Statement::SwitchStatement(self.build_switch_statement(&a, range)),
+            ast::Statement::VarDeclStatement(a) => model::Statement::VarDeclStatement(self.build_var_decl_statement(&a, range)),
+            ast::Statement::FunctionDeclStatement(a) => model::Statement::FunctionDeclStatement(self.build_function_decl_statement(&a, range)),
+            ast::Statement::LabeledStatement(a) => model::Statement::LabeledStatement(self.build_labeled_statement(&a, range)),
+            ast::Statement::TryStatement(a) => model::Statement::TryStatement(self.build_try_statement(&a, range)),
+        }
     }
     
     pub fn build_type_decl(&mut self, src: &ast::TypeDecl, range: &ParsedRange) -> model::ItemPtr<model::TypeDecl> {
