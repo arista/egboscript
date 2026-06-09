@@ -264,7 +264,7 @@ impl Parser {
     pub fn var_decl(&self, p: &mut impl PegParser) -> Option<Parsed<ast::Statement>> {
         p.for_rule(RuleName::VarDeclStatement, |p| {
             p.parse(|p| {
-                p.str("var")?;
+                let let_or_const = self.let_or_const(p)?;
                 self.opt_sp(p)?;
                 let name = self.identifier(p)?;
                 // FIXME - add type declaration
@@ -275,7 +275,17 @@ impl Parser {
                     let exp = self.expression(p)?.value;
                     Some(p.parsed(exp))
                 });
-                Some(p.parsed(ast::Statement::var_decl_statement(name, init)))
+                Some(p.parsed(ast::Statement::var_decl_statement(let_or_const, name, init)))
+            })
+        })
+    }
+
+    pub fn let_or_const(&self, p: &mut impl PegParser) -> Option<Parsed<ast::LetOrConst>> {
+        p.for_rule(RuleName::LetOrConst, |p| {
+            p.parse(|p| {
+                if let Some(r) = p.str("let") {Some(r.with_value(ast::LetOrConst::Let))}
+                else if let Some(r) = p.str("const") {Some(r.with_value(ast::LetOrConst::Const))}
+                else {None}
             })
         })
     }
@@ -1136,6 +1146,7 @@ pub enum RuleName {
     SwitchStatement,
     VarDecl,
     VarDeclStatement,
+    LetOrConst,
     FunctionDeclStatement,
     FunctionDeclArg,
     FunctionDeclArgs,
@@ -1231,7 +1242,8 @@ const RESERVED_WORDS: &[&str] = &[
     "case",
     "default",
     "function",
-    "var",
+    "let",
+    "const",
     "try",
     "catch",
     "finally",

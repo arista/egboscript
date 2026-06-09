@@ -104,8 +104,9 @@ impl Statement {
         })
     }
 
-    pub fn var_decl_statement(name: Parsed<String>, init: Option<Parsed<Expression>>) -> Self {
+    pub fn var_decl_statement(let_or_const: Parsed<LetOrConst>, name: Parsed<String>, init: Option<Parsed<Expression>>) -> Self {
         Self::VarDeclStatement(VarDeclStatement {
+            let_or_const,
             name,
             init: init.map(|v| Box::new(v)),
         })
@@ -202,6 +203,7 @@ pub enum SwitchItem {
 
 #[derive(Debug)]
 pub struct VarDeclStatement {
+    pub let_or_const: Parsed<LetOrConst>,
     pub name: Parsed<String>,
     pub init: Option<Box<Parsed<Expression>>>,
 }
@@ -344,6 +346,12 @@ pub struct IntLiteral {
     pub value: u64,
     pub radix: Radix,
     pub suffix: Option<Parsed<IntLiteralSuffix>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum LetOrConst {
+    Let,
+    Const,
 }
 
 #[derive(Debug, Clone, Copy)]

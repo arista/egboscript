@@ -175,11 +175,20 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_var_decl_statement(&mut self, src: &ast::VarDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::VarDeclStatement> {
-        self.build_item(src, range, |m| &mut m.var_decl_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.var_decl_statements, |v, mb| {
             model::VarDeclStatement {
-                // FIXME - implement this
+                let_or_const: mb.build_let_or_const(&v.let_or_const.value),
+                name: v.name.value.clone(),
+                init: v.init.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
             }
         })
+    }
+
+    pub fn build_let_or_const(&mut self, src: &ast::LetOrConst) -> model::LetOrConst {
+        match src {
+            ast::LetOrConst::Let => model::LetOrConst::Let,
+            ast::LetOrConst::Const => model::LetOrConst::Const,
+        }
     }
             
     pub fn build_function_decl_statement(&mut self, src: &ast::FunctionDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclStatement> {

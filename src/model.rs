@@ -310,7 +310,15 @@ pub struct SwitchStatement {
 
 #[derive(Debug)]
 pub struct VarDeclStatement {
-    // FIXME - implement this
+    pub let_or_const: LetOrConst,
+    pub name: String,
+    pub init: Option<Expression>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum LetOrConst {
+    Let,
+    Const,
 }
 
 #[derive(Debug)]
