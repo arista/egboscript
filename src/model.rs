@@ -140,6 +140,12 @@ pub struct SourceFilePtr {
     id: usize
 }
 
+impl SourceFilePtr {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+}
+
 pub struct SourceFiles {
     source_files: HashMap<SourceFilePtr, SourceFile>,
     id_counter: usize
@@ -300,6 +306,12 @@ impl<'a, T: ModelItem> Item<'a, T> {
     pub fn ptr(&self) -> ItemPtr<T> {
         self.ptr
     }
+
+    /// The source location (file + char range) this item was built from, if
+    /// recorded. Present for every parsed item; `None` for synthesized ones.
+    pub fn span(&self) -> Option<&'a SourceLocation> {
+        self.model.span_table.get(&self.ptr.key())
+    }
 }
 
 //--------------------------------------------------
@@ -338,6 +350,13 @@ macro_rules! enum_handle {
             pub fn new(model: &'a Model, value: $src) -> Self {
                 match value {
                     $($src::$domain(p) => Self::$variant(model.item(p)),)*
+                }
+            }
+
+            /// The span of the wrapped item.
+            pub fn span(&self) -> Option<&'a SourceLocation> {
+                match self {
+                    $(Self::$variant(x) => x.span(),)*
                 }
             }
         }
@@ -770,6 +789,15 @@ impl<'a> FileItem<'a> {
             FileItemData::Statement(s) => Self::Statement(Statement::new(model, s)),
         }
     }
+
+    /// The span of the wrapped item.
+    pub fn span(&self) -> Option<&'a SourceLocation> {
+        match self {
+            Self::ImportDecl(x) => x.span(),
+            Self::TypeDecl(x) => x.span(),
+            Self::Statement(x) => x.span(),
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -783,6 +811,14 @@ impl<'a> ForInit<'a> {
         match value {
             ForInitData::Expression(e) => Self::Expression(Expression::new(model, e)),
             ForInitData::VarDecl(s) => Self::VarDecl(Statement::new(model, s)),
+        }
+    }
+
+    /// The span of the wrapped item.
+    pub fn span(&self) -> Option<&'a SourceLocation> {
+        match self {
+            Self::Expression(x) => x.span(),
+            Self::VarDecl(x) => x.span(),
         }
     }
 }
@@ -800,6 +836,15 @@ impl<'a> SwitchItem<'a> {
             SwitchItemData::Statement(p) => Self::Statement(model.item(p)),
             SwitchItemData::Case(p) => Self::Case(model.item(p)),
             SwitchItemData::Default(p) => Self::Default(model.item(p)),
+        }
+    }
+
+    /// The span of the wrapped item.
+    pub fn span(&self) -> Option<&'a SourceLocation> {
+        match self {
+            Self::Statement(x) => x.span(),
+            Self::Case(x) => x.span(),
+            Self::Default(x) => x.span(),
         }
     }
 }
