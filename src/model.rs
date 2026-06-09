@@ -306,7 +306,16 @@ pub struct BlockStatement {
 
 #[derive(Debug)]
 pub struct ForStatement {
-    // FIXME - implement this
+    pub init: Option<ForInit>,
+    pub test: Option<Expression>,
+    pub advance: Option<Expression>,
+    pub stmt: Statement
+}
+
+#[derive(Debug)]
+pub enum ForInit {
+    Expression(Expression),
+    VarDecl(Statement),
 }
 
 #[derive(Debug)]

@@ -159,11 +159,21 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_for_statement(&mut self, src: &ast::ForStatement, range: &ParsedRange) -> model::ItemPtr<model::ForStatement> {
-        self.build_item(src, range, |m| &mut m.for_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.for_statements, |v, mb| {
             model::ForStatement {
-                // FIXME - implement this
+                init: v.init.as_ref().map(|v| mb.build_for_init(&v.value, &v.range)),
+                test: v.test.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
+                advance: v.advance.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
+                stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
+    }
+            
+    pub fn build_for_init(&mut self, src: &ast::ForInit, _range: &ParsedRange) -> model::ForInit {
+        match src {
+            ast::ForInit::Expression(v) => model::ForInit::Expression(self.build_expression(&v.value, &v.range)),
+            ast::ForInit::VarDecl(v) => model::ForInit::VarDecl(self.build_statement(&v.value, &v.range)),
+        }
     }
             
     pub fn build_switch_statement(&mut self, src: &ast::SwitchStatement, range: &ParsedRange) -> model::ItemPtr<model::SwitchStatement> {
