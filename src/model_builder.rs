@@ -177,9 +177,41 @@ impl<'a> ModelBuilder<'a> {
     }
             
     pub fn build_switch_statement(&mut self, src: &ast::SwitchStatement, range: &ParsedRange) -> model::ItemPtr<model::SwitchStatement> {
-        self.build_item(src, range, |m| &mut m.switch_statements, |_v, _mb| {
+        self.build_item(src, range, |m| &mut m.switch_statements, |v, mb| {
             model::SwitchStatement {
-                // FIXME - implement this
+                exp: mb.build_expression(&v.exp.value, &v.exp.range),
+                items: v.items.value.iter().map(|v| mb.build_switch_item(&v.value, &v.range)).collect(),
+            }
+        })
+    }
+            
+    pub fn build_switch_item(&mut self, src: &ast::SwitchItem, range: &ParsedRange) -> model::SwitchItem {
+        match src {
+            ast::SwitchItem::Statement(v) => model::SwitchItem::Statement(self.build_switch_body_statement(&v.value, &v.range)),
+            ast::SwitchItem::Case(v) => model::SwitchItem::Case(self.build_switch_case(&v.value, &v.range)),
+            ast::SwitchItem::Default => model::SwitchItem::Default(self.build_switch_default(range)),
+        }
+    }
+            
+    pub fn build_switch_body_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::ItemPtr<model::SwitchBodyStatement> {
+        self.build_item(src, range, |m| &mut m.switch_body_statements, |_v, mb| {
+            model::SwitchBodyStatement {
+                stmt: mb.build_statement(src, range),
+            }
+        })
+    }
+            
+    pub fn build_switch_case(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::ItemPtr<model::SwitchCase> {
+        self.build_item(src, range, |m| &mut m.switch_cases, |_v, mb| {
+            model::SwitchCase {
+                exp: mb.build_expression(src, range),
+            }
+        })
+    }
+            
+    pub fn build_switch_default(&mut self, range: &ParsedRange) -> model::ItemPtr<model::SwitchDefault> {
+        self.build_item(&(), range, |m| &mut m.switch_defaults, |_v, _mb| {
+            model::SwitchDefault {
             }
         })
     }

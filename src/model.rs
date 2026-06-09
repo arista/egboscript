@@ -24,6 +24,9 @@ pub struct Model {
     pub block_statements: ModelItems<BlockStatement>,
     pub for_statements: ModelItems<ForStatement>,
     pub switch_statements: ModelItems<SwitchStatement>,
+    pub switch_body_statements: ModelItems<SwitchBodyStatement>,
+    pub switch_cases: ModelItems<SwitchCase>,
+    pub switch_defaults: ModelItems<SwitchDefault>,
     pub var_decl_statements: ModelItems<VarDeclStatement>,
     pub function_decl_statements: ModelItems<FunctionDeclStatement>,
     pub function_signatures: ModelItems<FunctionSignature>,
@@ -62,6 +65,9 @@ impl Model {
             block_statements: ModelItems::new(ItemKind::BlockStatement),
             for_statements: ModelItems::new(ItemKind::ForStatement),
             switch_statements: ModelItems::new(ItemKind::SwitchStatement),
+            switch_body_statements: ModelItems::new(ItemKind::SwitchBodyStatement),
+            switch_cases: ModelItems::new(ItemKind::SwitchCase),
+            switch_defaults: ModelItems::new(ItemKind::SwitchDefault),
             var_decl_statements: ModelItems::new(ItemKind::VarDeclStatement),
             function_decl_statements: ModelItems::new(ItemKind::FunctionDeclStatement),
             function_signatures: ModelItems::new(ItemKind::FunctionSignature),
@@ -172,6 +178,9 @@ pub enum ItemKind {
     BlockStatement,
     ForStatement,
     SwitchStatement,
+    SwitchBodyStatement,
+    SwitchCase,
+    SwitchDefault,
     VarDeclStatement,
     FunctionDeclStatement,
     FunctionSignature,
@@ -320,7 +329,29 @@ pub enum ForInit {
 
 #[derive(Debug)]
 pub struct SwitchStatement {
-    // FIXME - implement this
+    pub exp: Expression,
+    pub items: Vec<SwitchItem>,
+}
+
+#[derive(Debug)]
+pub enum SwitchItem {
+    Statement(ItemPtr<SwitchBodyStatement>),
+    Case(ItemPtr<SwitchCase>),
+    Default(ItemPtr<SwitchDefault>),
+}
+
+#[derive(Debug)]
+pub struct SwitchBodyStatement {
+    pub stmt: Statement,
+}
+
+#[derive(Debug)]
+pub struct SwitchCase {
+    pub exp: Expression,
+}
+
+#[derive(Debug)]
+pub struct SwitchDefault {
 }
 
 #[derive(Debug)]
