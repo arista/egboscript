@@ -250,10 +250,32 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_ternary_expression(&mut self, src: &ast::TernaryExpression, range: &ParsedRange) -> model::ItemPtr<model::TernaryExpression> {
-        self.build_item(src, range, |m| &mut m.ternary_expressions, |_v, _mb| {
-            model::TernaryExpression {
-                // FIXME - implement this
+    pub fn build_ternary_expression(&mut self, src: &ast::TernaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::TernaryExpression> {
+        let if_false = self.build_expression(&src.if_false.value, &src.if_false.range);
+        self.build_one_ternary_expression(&src.terms, 0, &if_false)
+    }
+            
+    pub fn build_one_ternary_expression(&mut self, terms: &Vec<Parsed<ast::TernaryExpressionTerm>>, ix: usize, if_false: &model::Expression) -> model::ItemPtr<model::TernaryExpression> {
+        let term = &terms.get(ix).unwrap().value;
+        let test = self.build_expression(&term.test.value, &term.test.range);
+        let if_true = self.build_expression(&term.if_true.value, &term.if_true.range);
+        
+        self.build_item(&(), &term.test.range, |m| &mut m.ternary_expressions, |_v, mb| {
+            if ix == terms.len() - 1 {
+                model::TernaryExpression {
+                    test: test,
+                    if_true: if_true,
+                    if_false: *if_false,
+                }
+            }
+            else {
+                let e = mb.build_one_ternary_expression(terms, ix + 1, if_false);
+                let eexp = model::Expression::TernaryExpression(e);
+                model::TernaryExpression {
+                    test: test,
+                    if_true: if_true,
+                    if_false: eexp,
+                }
             }
         })
     }

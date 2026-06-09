@@ -366,7 +366,9 @@ pub struct CommaExpression {
 
 #[derive(Debug)]
 pub struct TernaryExpression {
-    // FIXME - implement this
+    pub test: Expression,
+    pub if_true: Expression,
+    pub if_false: Expression,
 }
 
 #[derive(Debug)]
