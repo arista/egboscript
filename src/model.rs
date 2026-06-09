@@ -42,7 +42,10 @@ pub struct Model {
     pub null_literals: ModelItems<NullLiteral>,
     pub string_literals: ModelItems<StringLiteral>,
     pub int_literals: ModelItems<IntLiteral>,
-    pub member_expressions: ModelItems<MemberExpression>,
+    pub dot_access_expressions: ModelItems<DotAccessExpression>,
+    pub index_access_expressions: ModelItems<IndexAccessExpression>,
+    pub function_call_expressions: ModelItems<FunctionCallExpression>,
+    pub non_null_assert_expressions: ModelItems<NonNullAssertExpression>,
     pub identifier_expressions: ModelItems<IdentifierExpression>,
 }
 
@@ -83,7 +86,10 @@ impl Model {
             null_literals: ModelItems::new(ItemKind::NullLiteral),
             string_literals: ModelItems::new(ItemKind::StringLiteral),
             int_literals: ModelItems::new(ItemKind::IntLiteral),
-            member_expressions: ModelItems::new(ItemKind::MemberExpression),
+            dot_access_expressions: ModelItems::new(ItemKind::DotAccessExpression),
+            index_access_expressions: ModelItems::new(ItemKind::IndexAccessExpression),
+            function_call_expressions: ModelItems::new(ItemKind::FunctionCallExpression),
+            non_null_assert_expressions: ModelItems::new(ItemKind::NonNullAssertExpression),
             identifier_expressions: ModelItems::new(ItemKind::IdentifierExpression),
         }
     }
@@ -197,7 +203,10 @@ pub enum ItemKind {
     NullLiteral,
     StringLiteral,
     IntLiteral,
-    MemberExpression,
+    DotAccessExpression,
+    IndexAccessExpression,
+    FunctionCallExpression,
+    NonNullAssertExpression,
     IdentifierExpression,
 }
 
@@ -413,7 +422,10 @@ pub enum Expression {
     NullLiteral(ItemPtr<NullLiteral>),
     StringLiteral(ItemPtr<StringLiteral>),
     IntLiteral(ItemPtr<IntLiteral>),
-    MemberExpression(ItemPtr<MemberExpression>),
+    DotAccessExpression(ItemPtr<DotAccessExpression>),
+    IndexAccessExpression(ItemPtr<IndexAccessExpression>),
+    FunctionCallExpression(ItemPtr<FunctionCallExpression>),
+    NonNullAssertExpression(ItemPtr<NonNullAssertExpression>),
     IdentifierExpression(ItemPtr<IdentifierExpression>),
 }
 
@@ -521,8 +533,26 @@ pub enum IntLiteralSuffix {
 }
 
 #[derive(Debug)]
-pub struct MemberExpression {
-    // FIXME - implement this
+pub struct DotAccessExpression {
+    pub exp: Expression,
+    pub name: String,
+}
+
+#[derive(Debug)]
+pub struct IndexAccessExpression {
+    pub exp: Expression,
+    pub access_exp: Expression,
+}
+
+#[derive(Debug)]
+pub struct FunctionCallExpression {
+    pub exp: Expression,
+    pub args: Vec<Expression>,
+}
+
+#[derive(Debug)]
+pub struct NonNullAssertExpression {
+    pub exp: Expression,
 }
 
 #[derive(Debug)]

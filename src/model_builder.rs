@@ -297,7 +297,7 @@ impl<'a> ModelBuilder<'a> {
                 ast::Expression::NullLiteral => model::Expression::NullLiteral(self.build_null_literal(range)),
                 ast::Expression::StringLiteral(a) => model::Expression::StringLiteral(self.build_string_literal(&a, range)),
                 ast::Expression::IntLiteral(a) => model::Expression::IntLiteral(self.build_int_literal(&a, range)),
-                ast::Expression::MemberExpression(a) => model::Expression::MemberExpression(self.build_member_expression(&a, range)),
+                ast::Expression::MemberExpression(a) => self.build_member_expression(&a, range),
                 ast::Expression::IdentifierExpression(a) => model::Expression::IdentifierExpression(self.build_identifier_expression(&a, range)),
             }
     }
@@ -491,10 +491,63 @@ impl<'a> ModelBuilder<'a> {
         }
     }
             
-    pub fn build_member_expression(&mut self, src: &ast::MemberExpression, range: &ParsedRange) -> model::ItemPtr<model::MemberExpression> {
-        self.build_item(src, range, |m| &mut m.member_expressions, |_v, _mb| {
-            model::MemberExpression {
-                // FIXME - implement this
+    pub fn build_member_expression(&mut self, src: &ast::MemberExpression, _range: &ParsedRange) -> model::Expression {
+        let first = self.build_expression(&src.first.value, &src.first.range);
+        self.build_one_member_expression(&src.rest, src.rest.len() - 1, &first)
+    }
+            
+    pub fn build_one_member_expression(&mut self, rest: &Vec<Parsed<ast::MemberOp>>, ix: usize, exp: &model::Expression) -> model::Expression {
+        let op = &rest.get(ix).unwrap();
+
+        if ix == 0 {
+            self.build_member_expression_op(op, exp)
+        }
+        else {
+            let e = self.build_one_member_expression(rest, ix - 1, exp);
+            self.build_member_expression_op(op, &e)
+        }
+    }
+
+    pub fn build_member_expression_op(&mut self, op: &Parsed<ast::MemberOp>, exp: &model::Expression) -> model::Expression {
+        match &op.value {
+            ast::MemberOp::DotAccess(v) => model::Expression::DotAccessExpression(self.build_dot_access_expression(v, &op.range, exp)),
+            ast::MemberOp::IndexAccess(v) => model::Expression::IndexAccessExpression(self.build_index_access_expression(v, &op.range, exp)),
+            ast::MemberOp::FunctionCall(v) => model::Expression::FunctionCallExpression(self.build_function_call_expression(v, &op.range, exp)),
+            ast::MemberOp::NonNullAssert => model::Expression::NonNullAssertExpression(self.build_non_null_assert_expression(&op.range, exp)),
+        }
+    }
+
+    pub fn build_dot_access_expression(&mut self, src: &ast::DotAccess, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::DotAccessExpression> {
+        self.build_item(src, range, |m| &mut m.dot_access_expressions, |v, _mb| {
+            model::DotAccessExpression {
+                exp: *exp,
+                name: v.name.value.clone(),
+            }
+        })
+    }
+
+    pub fn build_index_access_expression(&mut self, src: &ast::IndexAccess, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::IndexAccessExpression> {
+        self.build_item(src, range, |m| &mut m.index_access_expressions, |v, mb| {
+            model::IndexAccessExpression {
+                exp: *exp,
+                access_exp: mb.build_expression(&v.exp.value, &v.exp.range),
+            }
+        })
+    }
+
+    pub fn build_function_call_expression(&mut self, src: &ast::FunctionCall, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::FunctionCallExpression> {
+        self.build_item(src, range, |m| &mut m.function_call_expressions, |v, mb| {
+            model::FunctionCallExpression {
+                exp: *exp,
+                args: v.args.value.iter().map(|v| mb.build_expression(&v.value, &v.range)).collect(),
+            }
+        })
+    }
+
+    pub fn build_non_null_assert_expression(&mut self, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::NonNullAssertExpression> {
+        self.build_item(&(), range, |m| &mut m.non_null_assert_expressions, |_v, _mb| {
+            model::NonNullAssertExpression {
+                exp: *exp,
             }
         })
     }
