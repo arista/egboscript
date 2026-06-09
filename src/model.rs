@@ -12,7 +12,6 @@ pub struct Model {
 
     // Dense arrays of each item type
     pub files: ModelItems<File>,
-    pub file_items: ModelItems<FileItem>,
     pub type_decls: ModelItems<TypeDecl>,
     pub import_decls: ModelItems<ImportDecl>,
     pub empty_statements: ModelItems<EmptyStatement>,
@@ -30,7 +29,6 @@ pub struct Model {
     pub labeled_statements: ModelItems<LabeledStatement>,
     pub try_statements: ModelItems<TryStatement>,
     pub catch_clauses: ModelItems<CatchClause>,
-    pub expressions: ModelItems<Expression>,
     pub comma_expressions: ModelItems<CommaExpression>,
     pub ternary_expressions: ModelItems<TernaryExpression>,
     pub binary_expressions: ModelItems<BinaryExpression>,
@@ -50,7 +48,6 @@ impl Model {
             span_table: HashMap::new(),
             
             files: ModelItems::new(ItemKind::File),
-            file_items: ModelItems::new(ItemKind::FileItem),
             type_decls: ModelItems::new(ItemKind::TypeDecl),
             import_decls: ModelItems::new(ItemKind::ImportDecl),
             empty_statements: ModelItems::new(ItemKind::EmptyStatement),
@@ -68,7 +65,6 @@ impl Model {
             labeled_statements: ModelItems::new(ItemKind::LabeledStatement),
             try_statements: ModelItems::new(ItemKind::TryStatement),
             catch_clauses: ModelItems::new(ItemKind::CatchClause),
-            expressions: ModelItems::new(ItemKind::Expression),
             comma_expressions: ModelItems::new(ItemKind::CommaExpression),
             ternary_expressions: ModelItems::new(ItemKind::TernaryExpression),
             binary_expressions: ModelItems::new(ItemKind::BinaryExpression),
@@ -222,10 +218,10 @@ pub struct ItemKey {
 
 #[derive(Debug)]
 pub struct File {
-    pub items: Vec<ItemPtr<FileItem>>
+    pub items: Vec<FileItem>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum FileItem {
     ImportDecl(ItemPtr<ImportDecl>),
     TypeDecl(ItemPtr<TypeDecl>),
@@ -242,7 +238,7 @@ pub struct ImportDecl {
     // FIXME - implement this
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Statement {
     EmptyStatement(ItemPtr<EmptyStatement>),
     ExpressionStatement(ItemPtr<ExpressionStatement>),
@@ -267,25 +263,25 @@ pub struct EmptyStatement {
 
 #[derive(Debug)]
 pub struct ExpressionStatement {
-    pub exp: ItemPtr<Expression>,
+    pub exp: Expression,
 }
 
 #[derive(Debug)]
 pub struct IfStatement {
-    pub test: ItemPtr<Expression>,
+    pub test: Expression,
     pub if_true: Statement,
     pub if_false: Option<Statement>,
 }
 
 #[derive(Debug)]
 pub struct WhileStatement {
-    pub test: ItemPtr<Expression>,
+    pub test: Expression,
     pub stmt: Statement,
 }
 
 #[derive(Debug)]
 pub struct ReturnStatement {
-    pub exp: Option<ItemPtr<Expression>>,
+    pub exp: Option<Expression>,
 }
 
 #[derive(Debug)]
@@ -342,7 +338,7 @@ pub struct CatchClause {
     pub stmt: Statement,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Expression {
     CommaExpression(ItemPtr<CommaExpression>),
     TernaryExpression(ItemPtr<TernaryExpression>),
@@ -358,7 +354,7 @@ pub enum Expression {
 
 #[derive(Debug)]
 pub struct CommaExpression {
-    pub exps: Vec<ItemPtr<Expression>>
+    pub exps: Vec<Expression>
 }
 
 #[derive(Debug)]
@@ -374,7 +370,7 @@ pub struct BinaryExpression {
 #[derive(Debug)]
 pub struct UnaryExpression {
     pub op: UnaryOp,
-    pub exp: ItemPtr<Expression>
+    pub exp: Expression
 }
 
 #[derive(Debug, Clone, Copy)]

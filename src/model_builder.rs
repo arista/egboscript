@@ -49,14 +49,12 @@ impl<'a> ModelBuilder<'a> {
         })
     }
     
-    pub fn build_file_item(&mut self, src: &ast::FileItem, range: &ParsedRange) -> model::ItemPtr<model::FileItem> {
-        self.build_item(src, range, |m| &mut m.file_items, |v, mb| {
-            match v {
-                ast::FileItem::Statement(a) => model::FileItem::Statement(mb.build_statement(a, range)),
-                ast::FileItem::TypeDecl(a) => model::FileItem::TypeDecl(mb.build_type_decl(a, range)),
-                ast::FileItem::ImportDecl(a) => model::FileItem::ImportDecl(mb.build_import_decl(a, range)),
-            }
-        })
+    pub fn build_file_item(&mut self, src: &ast::FileItem, range: &ParsedRange) -> model::FileItem {
+        match src {
+            ast::FileItem::Statement(a) => model::FileItem::Statement(self.build_statement(&a, range)),
+            ast::FileItem::TypeDecl(a) => model::FileItem::TypeDecl(self.build_type_decl(&a, range)),
+            ast::FileItem::ImportDecl(a) => model::FileItem::ImportDecl(self.build_import_decl(&a, range)),
+        }
     }
     
     pub fn build_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::Statement {
@@ -220,21 +218,19 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_expression(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::ItemPtr<model::Expression> {
-        self.build_item(src, range, |m| &mut m.expressions, |v, mb| {
-            match v {
-                ast::Expression::CommaExpression(a) => model::Expression::CommaExpression(mb.build_comma_expression(a, range)),
-                ast::Expression::TernaryExpression(a) => model::Expression::TernaryExpression(mb.build_ternary_expression(a, range)),
-                ast::Expression::BinaryExpression(a) => model::Expression::BinaryExpression(mb.build_binary_expression(a, range)),
-                ast::Expression::UnaryExpression(a) => model::Expression::UnaryExpression(mb.build_unary_expression(a, range)),
-                ast::Expression::BooleanLiteral(a) => model::Expression::BooleanLiteral(mb.build_boolean_literal(a, range)),
-                ast::Expression::NullLiteral => model::Expression::NullLiteral(mb.build_null_literal(range)),
-                ast::Expression::StringLiteral(a) => model::Expression::StringLiteral(mb.build_string_literal(a, range)),
-                ast::Expression::IntLiteral(a) => model::Expression::IntLiteral(mb.build_int_literal(a, range)),
-                ast::Expression::MemberExpression(a) => model::Expression::MemberExpression(mb.build_member_expression(a, range)),
-                ast::Expression::IdentifierExpression(a) => model::Expression::IdentifierExpression(mb.build_identifier_expression(a, range)),
+    pub fn build_expression(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::Expression {
+            match src {
+                ast::Expression::CommaExpression(a) => model::Expression::CommaExpression(self.build_comma_expression(&a, range)),
+                ast::Expression::TernaryExpression(a) => model::Expression::TernaryExpression(self.build_ternary_expression(&a, range)),
+                ast::Expression::BinaryExpression(a) => model::Expression::BinaryExpression(self.build_binary_expression(&a, range)),
+                ast::Expression::UnaryExpression(a) => model::Expression::UnaryExpression(self.build_unary_expression(&a, range)),
+                ast::Expression::BooleanLiteral(a) => model::Expression::BooleanLiteral(self.build_boolean_literal(&a, range)),
+                ast::Expression::NullLiteral => model::Expression::NullLiteral(self.build_null_literal(range)),
+                ast::Expression::StringLiteral(a) => model::Expression::StringLiteral(self.build_string_literal(&a, range)),
+                ast::Expression::IntLiteral(a) => model::Expression::IntLiteral(self.build_int_literal(&a, range)),
+                ast::Expression::MemberExpression(a) => model::Expression::MemberExpression(self.build_member_expression(&a, range)),
+                ast::Expression::IdentifierExpression(a) => model::Expression::IdentifierExpression(self.build_identifier_expression(&a, range)),
             }
-        })
     }
             
     pub fn build_comma_expression(&mut self, src: &ast::CommaExpression, range: &ParsedRange) -> model::ItemPtr<model::CommaExpression> {
@@ -266,7 +262,7 @@ impl<'a> ModelBuilder<'a> {
         self.build_one_unary_expression(&src.ops, 0, &exp)
     }
             
-    fn build_one_unary_expression(&mut self, ops: &Vec<Parsed<ast::UnaryOp>>, ix: usize, exp: &model::ItemPtr<model::Expression>) -> model::ItemPtr<model::UnaryExpression> {
+    fn build_one_unary_expression(&mut self, ops: &Vec<Parsed<ast::UnaryOp>>, ix: usize, exp: &model::Expression) -> model::ItemPtr<model::UnaryExpression> {
         let op = ops.get(ix).unwrap();
         let model_op = self.build_unary_op(&op.value);
         self.build_item(&(), &op.range, |m| &mut m.unary_expressions, |_v, mb| {
@@ -279,9 +275,7 @@ impl<'a> ModelBuilder<'a> {
             else {
                 let e = mb.build_one_unary_expression(ops, ix + 1, exp);
                 // Build an Expression around the UnaryExpression
-                let eexp = mb.build_item(&e, &op.range, |m| &mut m.expressions, |v, _mb| {
-                    model::Expression::UnaryExpression(v.clone())
-                });
+                let eexp = model::Expression::UnaryExpression(e);
                 model::UnaryExpression {
                     op: model_op,
                     exp: eexp,
