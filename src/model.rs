@@ -371,7 +371,47 @@ pub struct TernaryExpression {
 
 #[derive(Debug)]
 pub struct BinaryExpression {
-    // FIXME - implement this
+    pub left: Expression,
+    pub op: BinaryOp,
+    pub right: Expression,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BinaryOp {
+    Plus,
+    Minus,
+    Times,
+    Divide,
+    Mod,
+    ShiftLeft,
+    LogicalShiftRight,
+    ArithmeticShiftRight,
+    LessThan,
+    LessThanOrEquals,
+    GreaterThan,
+    GreaterThanOrEquals,
+    Equals,
+    NotEquals,
+    BitwiseAnd,
+    BitwiseXor,
+    BitwiseOr,
+    LogicalAnd,
+    LogicalOr,
+
+    Assign,
+    PlusAssign,
+    MinusAssign,
+    TimesAssign,
+    DivideAssign,
+    ModAssign,
+    ShiftLeftAssign,
+    LogicalShiftRightAssign,
+    ArithmeticShiftRightAssign,
+    BitwiseAndAssign,
+    BitwiseXorAssign,
+    BitwiseOrAssign,
+    LogicalAndAssign,
+    LogicalOrAssign,
 }
 
 #[derive(Debug)]

@@ -258,12 +258,74 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_binary_expression(&mut self, src: &ast::BinaryExpression, range: &ParsedRange) -> model::ItemPtr<model::BinaryExpression> {
-        self.build_item(src, range, |m| &mut m.binary_expressions, |_v, _mb| {
-            model::BinaryExpression {
-                // FIXME - implement this
+    pub fn build_binary_expression(&mut self, src: &ast::BinaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::BinaryExpression> {
+        let first = self.build_expression(&src.first.value, &src.first.range);
+        self.build_one_binary_expression(&src.rest, src.rest.len() - 1, &first)
+    }
+            
+    fn build_one_binary_expression(&mut self, terms: &Vec<Parsed<ast::BinaryExpressionTerm>>, ix: usize, first: &model::Expression) -> model::ItemPtr<model::BinaryExpression> {
+        let term = &terms.get(ix).unwrap().value;
+        let op = &term.op;
+        let model_op = self.build_binary_op(&op.value);
+        let right = self.build_expression(&term.exp.value, &term.exp.range);
+        
+        self.build_item(&(), &op.range, |m| &mut m.binary_expressions, |_v, mb| {
+            if ix == 0 {
+                model::BinaryExpression {
+                    left: *first,
+                    op: model_op,
+                    right,
+                }
+            }
+            else {
+                let e = mb.build_one_binary_expression(terms, ix - 1, first);
+                // Build an Expression around the UnaryExpression
+                let eexp = model::Expression::BinaryExpression(e);
+                model::BinaryExpression {
+                    left: eexp,
+                    op: model_op,
+                    right: right,
+                }
             }
         })
+    }
+
+    pub fn build_binary_op(&mut self, src: &ast::BinaryOp) -> model::BinaryOp {
+        match src {
+            ast::BinaryOp::Plus => model::BinaryOp::Plus,
+            ast::BinaryOp::Minus => model::BinaryOp::Minus,
+            ast::BinaryOp::Times => model::BinaryOp::Times,
+            ast::BinaryOp::Divide => model::BinaryOp::Divide,
+            ast::BinaryOp::Mod => model::BinaryOp::Mod,
+            ast::BinaryOp::ShiftLeft => model::BinaryOp::ShiftLeft,
+            ast::BinaryOp::LogicalShiftRight => model::BinaryOp::LogicalShiftRight,
+            ast::BinaryOp::ArithmeticShiftRight => model::BinaryOp::ArithmeticShiftRight,
+            ast::BinaryOp::LessThan => model::BinaryOp::LessThan,
+            ast::BinaryOp::LessThanOrEquals => model::BinaryOp::LessThanOrEquals,
+            ast::BinaryOp::GreaterThan => model::BinaryOp::GreaterThan,
+            ast::BinaryOp::GreaterThanOrEquals => model::BinaryOp::GreaterThanOrEquals,
+            ast::BinaryOp::Equals => model::BinaryOp::Equals,
+            ast::BinaryOp::NotEquals => model::BinaryOp::NotEquals,
+            ast::BinaryOp::BitwiseAnd => model::BinaryOp::BitwiseAnd,
+            ast::BinaryOp::BitwiseXor => model::BinaryOp::BitwiseXor,
+            ast::BinaryOp::BitwiseOr => model::BinaryOp::BitwiseOr,
+            ast::BinaryOp::LogicalAnd => model::BinaryOp::LogicalAnd,
+            ast::BinaryOp::LogicalOr => model::BinaryOp::LogicalOr,
+            ast::BinaryOp::Assign => model::BinaryOp::Assign,
+            ast::BinaryOp::PlusAssign => model::BinaryOp::PlusAssign,
+            ast::BinaryOp::MinusAssign => model::BinaryOp::MinusAssign,
+            ast::BinaryOp::TimesAssign => model::BinaryOp::TimesAssign,
+            ast::BinaryOp::DivideAssign => model::BinaryOp::DivideAssign,
+            ast::BinaryOp::ModAssign => model::BinaryOp::ModAssign,
+            ast::BinaryOp::ShiftLeftAssign => model::BinaryOp::ShiftLeftAssign,
+            ast::BinaryOp::LogicalShiftRightAssign => model::BinaryOp::LogicalShiftRightAssign,
+            ast::BinaryOp::ArithmeticShiftRightAssign => model::BinaryOp::ArithmeticShiftRightAssign,
+            ast::BinaryOp::BitwiseAndAssign => model::BinaryOp::BitwiseAndAssign,
+            ast::BinaryOp::BitwiseXorAssign => model::BinaryOp::BitwiseXorAssign,
+            ast::BinaryOp::BitwiseOrAssign => model::BinaryOp::BitwiseOrAssign,
+            ast::BinaryOp::LogicalAndAssign => model::BinaryOp::LogicalAndAssign,
+            ast::BinaryOp::LogicalOrAssign => model::BinaryOp::LogicalOrAssign,
+        }
     }
             
     pub fn build_unary_expression(&mut self, src: &ast::UnaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::UnaryExpression> {
