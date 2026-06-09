@@ -258,7 +258,6 @@ pub enum Statement {
 
 #[derive(Debug)]
 pub struct EmptyStatement {
-    // FIXME - implement this
 }
 
 #[derive(Debug)]
