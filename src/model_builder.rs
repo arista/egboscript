@@ -3,7 +3,7 @@ use crate::model;
 use crate::peg_parser::{Parsed, ParsedRange};
 
 
-pub fn add_file_to_model(source_file: &String, src: &Parsed<ast::File>, model: &mut model::Model) -> model::ItemPtr<model::File> {
+pub fn add_file_to_model(source_file: &String, src: &Parsed<ast::File>, model: &mut model::Model) -> model::ItemPtr<model::FileData> {
     let source_file = model.source_files.add(source_file.clone());
     let mut mb = ModelBuilder::new(model, source_file);
     mb.build_file(&src.value, &src.range)
@@ -41,76 +41,76 @@ impl<'a> ModelBuilder<'a> {
         ptr
     }
     
-    pub fn build_file(&mut self, src: &ast::File, range: &ParsedRange) -> model::ItemPtr<model::File> {
+    pub fn build_file(&mut self, src: &ast::File, range: &ParsedRange) -> model::ItemPtr<model::FileData> {
         self.build_item(src, range, |m| &mut m.files, |v, mb| {
-            model::File {
+            model::FileData {
                 items: v.items.iter().map(|v| mb.build_file_item(&v.value, &v.range)).collect(),
             }
         })
     }
     
-    pub fn build_file_item(&mut self, src: &ast::FileItem, range: &ParsedRange) -> model::FileItem {
+    pub fn build_file_item(&mut self, src: &ast::FileItem, range: &ParsedRange) -> model::FileItemData {
         match src {
-            ast::FileItem::Statement(a) => model::FileItem::Statement(self.build_statement(&a, range)),
-            ast::FileItem::TypeDecl(a) => model::FileItem::TypeDecl(self.build_type_decl(&a, range)),
-            ast::FileItem::ImportDecl(a) => model::FileItem::ImportDecl(self.build_import_decl(&a, range)),
+            ast::FileItem::Statement(a) => model::FileItemData::Statement(self.build_statement(&a, range)),
+            ast::FileItem::TypeDecl(a) => model::FileItemData::TypeDecl(self.build_type_decl(&a, range)),
+            ast::FileItem::ImportDecl(a) => model::FileItemData::ImportDecl(self.build_import_decl(&a, range)),
         }
     }
     
-    pub fn build_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::Statement {
+    pub fn build_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::StatementData {
         match src {
-            ast::Statement::EmptyStatement => model::Statement::EmptyStatement(self.build_empty_statement(range)),
-            ast::Statement::ExpressionStatement(a) => model::Statement::ExpressionStatement(self.build_expression_statement(&a, range)),
-            ast::Statement::IfStatement(a) => model::Statement::IfStatement(self.build_if_statement(&a, range)),
-            ast::Statement::WhileStatement(a) => model::Statement::WhileStatement(self.build_while_statement(&a, range)),
-            ast::Statement::ReturnStatement(a) => model::Statement::ReturnStatement(self.build_return_statement(&a, range)),
-            ast::Statement::BreakStatement(a) => model::Statement::BreakStatement(self.build_break_statement(&a, range)),
-            ast::Statement::ContinueStatement(a) => model::Statement::ContinueStatement(self.build_continue_statement(&a, range)),
-            ast::Statement::BlockStatement(a) => model::Statement::BlockStatement(self.build_block_statement(&a, range)),
-            ast::Statement::ForStatement(a) => model::Statement::ForStatement(self.build_for_statement(&a, range)),
-            ast::Statement::SwitchStatement(a) => model::Statement::SwitchStatement(self.build_switch_statement(&a, range)),
-            ast::Statement::VarDeclStatement(a) => model::Statement::VarDeclStatement(self.build_var_decl_statement(&a, range)),
-            ast::Statement::FunctionDeclStatement(a) => model::Statement::FunctionDeclStatement(self.build_function_decl_statement(&a, range)),
-            ast::Statement::LabeledStatement(a) => model::Statement::LabeledStatement(self.build_labeled_statement(&a, range)),
-            ast::Statement::TryStatement(a) => model::Statement::TryStatement(self.build_try_statement(&a, range)),
+            ast::Statement::EmptyStatement => model::StatementData::EmptyStatement(self.build_empty_statement(range)),
+            ast::Statement::ExpressionStatement(a) => model::StatementData::ExpressionStatement(self.build_expression_statement(&a, range)),
+            ast::Statement::IfStatement(a) => model::StatementData::IfStatement(self.build_if_statement(&a, range)),
+            ast::Statement::WhileStatement(a) => model::StatementData::WhileStatement(self.build_while_statement(&a, range)),
+            ast::Statement::ReturnStatement(a) => model::StatementData::ReturnStatement(self.build_return_statement(&a, range)),
+            ast::Statement::BreakStatement(a) => model::StatementData::BreakStatement(self.build_break_statement(&a, range)),
+            ast::Statement::ContinueStatement(a) => model::StatementData::ContinueStatement(self.build_continue_statement(&a, range)),
+            ast::Statement::BlockStatement(a) => model::StatementData::BlockStatement(self.build_block_statement(&a, range)),
+            ast::Statement::ForStatement(a) => model::StatementData::ForStatement(self.build_for_statement(&a, range)),
+            ast::Statement::SwitchStatement(a) => model::StatementData::SwitchStatement(self.build_switch_statement(&a, range)),
+            ast::Statement::VarDeclStatement(a) => model::StatementData::VarDeclStatement(self.build_var_decl_statement(&a, range)),
+            ast::Statement::FunctionDeclStatement(a) => model::StatementData::FunctionDeclStatement(self.build_function_decl_statement(&a, range)),
+            ast::Statement::LabeledStatement(a) => model::StatementData::LabeledStatement(self.build_labeled_statement(&a, range)),
+            ast::Statement::TryStatement(a) => model::StatementData::TryStatement(self.build_try_statement(&a, range)),
         }
     }
     
-    pub fn build_type_decl(&mut self, src: &ast::TypeDecl, range: &ParsedRange) -> model::ItemPtr<model::TypeDecl> {
+    pub fn build_type_decl(&mut self, src: &ast::TypeDecl, range: &ParsedRange) -> model::ItemPtr<model::TypeDeclData> {
         self.build_item(src, range, |m| &mut m.type_decls, |_v, _mb| {
-            model::TypeDecl {
+            model::TypeDeclData {
                 // FIXME - implement this
             }
         })
     }
     
-    pub fn build_import_decl(&mut self, src: &ast::ImportDecl, range: &ParsedRange) -> model::ItemPtr<model::ImportDecl> {
+    pub fn build_import_decl(&mut self, src: &ast::ImportDecl, range: &ParsedRange) -> model::ItemPtr<model::ImportDeclData> {
         self.build_item(src, range, |m| &mut m.import_decls, |v, _mb| {
-            model::ImportDecl {
+            model::ImportDeclData {
                 name: v.name.value.clone(),
                 source: v.source.value.clone(),
             }
         })
     }
 
-    pub fn build_empty_statement(&mut self, range: &ParsedRange) -> model::ItemPtr<model::EmptyStatement> {
+    pub fn build_empty_statement(&mut self, range: &ParsedRange) -> model::ItemPtr<model::EmptyStatementData> {
         self.build_item(&(), range, |m| &mut m.empty_statements, |_v, _mb| {
-            model::EmptyStatement {
+            model::EmptyStatementData {
             }
         })
     }
             
-    pub fn build_expression_statement(&mut self, src: &ast::ExpressionStatement, range: &ParsedRange) -> model::ItemPtr<model::ExpressionStatement> {
+    pub fn build_expression_statement(&mut self, src: &ast::ExpressionStatement, range: &ParsedRange) -> model::ItemPtr<model::ExpressionStatementData> {
         self.build_item(src, range, |m| &mut m.expression_statements, |v, mb| {
-            model::ExpressionStatement {
+            model::ExpressionStatementData {
                 exp: mb.build_expression(&v.exp.value, &v.exp.range)
             }
         })
     }
             
-    pub fn build_if_statement(&mut self, src: &ast::IfStatement, range: &ParsedRange) -> model::ItemPtr<model::IfStatement> {
+    pub fn build_if_statement(&mut self, src: &ast::IfStatement, range: &ParsedRange) -> model::ItemPtr<model::IfStatementData> {
         self.build_item(src, range, |m| &mut m.if_statements, |v, mb| {
-            model::IfStatement {
+            model::IfStatementData {
                 test: mb.build_expression(&v.test.value, &v.test.range),
                 if_true: mb.build_statement(&v.if_true.value, &v.if_true.range),
                 if_false: v.if_false.as_ref().map(|v| mb.build_statement(&v.value, &v.range)),
@@ -118,50 +118,50 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_while_statement(&mut self, src: &ast::WhileStatement, range: &ParsedRange) -> model::ItemPtr<model::WhileStatement> {
+    pub fn build_while_statement(&mut self, src: &ast::WhileStatement, range: &ParsedRange) -> model::ItemPtr<model::WhileStatementData> {
         self.build_item(src, range, |m| &mut m.while_statements, |v, mb| {
-            model::WhileStatement {
+            model::WhileStatementData {
                 test: mb.build_expression(&v.test.value, &v.test.range),
                 stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
     }
             
-    pub fn build_return_statement(&mut self, src: &ast::ReturnStatement, range: &ParsedRange) -> model::ItemPtr<model::ReturnStatement> {
+    pub fn build_return_statement(&mut self, src: &ast::ReturnStatement, range: &ParsedRange) -> model::ItemPtr<model::ReturnStatementData> {
         self.build_item(src, range, |m| &mut m.return_statements, |v, mb| {
-            model::ReturnStatement {
+            model::ReturnStatementData {
                 exp: v.exp.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
             }
         })
     }
             
-    pub fn build_break_statement(&mut self, src: &ast::BreakStatement, range: &ParsedRange) -> model::ItemPtr<model::BreakStatement> {
+    pub fn build_break_statement(&mut self, src: &ast::BreakStatement, range: &ParsedRange) -> model::ItemPtr<model::BreakStatementData> {
         self.build_item(src, range, |m| &mut m.break_statements, |v, _mb| {
-            model::BreakStatement {
+            model::BreakStatementData {
                 label: v.label.as_ref().map(|v| v.value.clone()),
             }
         })
     }
             
-    pub fn build_continue_statement(&mut self, src: &ast::ContinueStatement, range: &ParsedRange) -> model::ItemPtr<model::ContinueStatement> {
+    pub fn build_continue_statement(&mut self, src: &ast::ContinueStatement, range: &ParsedRange) -> model::ItemPtr<model::ContinueStatementData> {
         self.build_item(src, range, |m| &mut m.continue_statements, |v, _mb| {
-            model::ContinueStatement {
+            model::ContinueStatementData {
                 label: v.label.as_ref().map(|v| v.value.clone()),
             }
         })
     }
             
-    pub fn build_block_statement(&mut self, src: &ast::BlockStatement, range: &ParsedRange) -> model::ItemPtr<model::BlockStatement> {
+    pub fn build_block_statement(&mut self, src: &ast::BlockStatement, range: &ParsedRange) -> model::ItemPtr<model::BlockStatementData> {
         self.build_item(src, range, |m| &mut m.block_statements, |v, mb| {
-            model::BlockStatement {
+            model::BlockStatementData {
                 stmts: v.stmts.value.iter().map(|v| mb.build_statement(&v.value, &v.range)).collect()
             }
         })
     }
             
-    pub fn build_for_statement(&mut self, src: &ast::ForStatement, range: &ParsedRange) -> model::ItemPtr<model::ForStatement> {
+    pub fn build_for_statement(&mut self, src: &ast::ForStatement, range: &ParsedRange) -> model::ItemPtr<model::ForStatementData> {
         self.build_item(src, range, |m| &mut m.for_statements, |v, mb| {
-            model::ForStatement {
+            model::ForStatementData {
                 init: v.init.as_ref().map(|v| mb.build_for_init(&v.value, &v.range)),
                 test: v.test.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
                 advance: v.advance.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
@@ -170,56 +170,56 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_for_init(&mut self, src: &ast::ForInit, _range: &ParsedRange) -> model::ForInit {
+    pub fn build_for_init(&mut self, src: &ast::ForInit, _range: &ParsedRange) -> model::ForInitData {
         match src {
-            ast::ForInit::Expression(v) => model::ForInit::Expression(self.build_expression(&v.value, &v.range)),
-            ast::ForInit::VarDecl(v) => model::ForInit::VarDecl(self.build_statement(&v.value, &v.range)),
+            ast::ForInit::Expression(v) => model::ForInitData::Expression(self.build_expression(&v.value, &v.range)),
+            ast::ForInit::VarDecl(v) => model::ForInitData::VarDecl(self.build_statement(&v.value, &v.range)),
         }
     }
             
-    pub fn build_switch_statement(&mut self, src: &ast::SwitchStatement, range: &ParsedRange) -> model::ItemPtr<model::SwitchStatement> {
+    pub fn build_switch_statement(&mut self, src: &ast::SwitchStatement, range: &ParsedRange) -> model::ItemPtr<model::SwitchStatementData> {
         self.build_item(src, range, |m| &mut m.switch_statements, |v, mb| {
-            model::SwitchStatement {
+            model::SwitchStatementData {
                 exp: mb.build_expression(&v.exp.value, &v.exp.range),
                 items: v.items.value.iter().map(|v| mb.build_switch_item(&v.value, &v.range)).collect(),
             }
         })
     }
             
-    pub fn build_switch_item(&mut self, src: &ast::SwitchItem, range: &ParsedRange) -> model::SwitchItem {
+    pub fn build_switch_item(&mut self, src: &ast::SwitchItem, range: &ParsedRange) -> model::SwitchItemData {
         match src {
-            ast::SwitchItem::Statement(v) => model::SwitchItem::Statement(self.build_switch_body_statement(&v.value, &v.range)),
-            ast::SwitchItem::Case(v) => model::SwitchItem::Case(self.build_switch_case(&v.value, &v.range)),
-            ast::SwitchItem::Default => model::SwitchItem::Default(self.build_switch_default(range)),
+            ast::SwitchItem::Statement(v) => model::SwitchItemData::Statement(self.build_switch_body_statement(&v.value, &v.range)),
+            ast::SwitchItem::Case(v) => model::SwitchItemData::Case(self.build_switch_case(&v.value, &v.range)),
+            ast::SwitchItem::Default => model::SwitchItemData::Default(self.build_switch_default(range)),
         }
     }
             
-    pub fn build_switch_body_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::ItemPtr<model::SwitchBodyStatement> {
+    pub fn build_switch_body_statement(&mut self, src: &ast::Statement, range: &ParsedRange) -> model::ItemPtr<model::SwitchBodyStatementData> {
         self.build_item(src, range, |m| &mut m.switch_body_statements, |_v, mb| {
-            model::SwitchBodyStatement {
+            model::SwitchBodyStatementData {
                 stmt: mb.build_statement(src, range),
             }
         })
     }
             
-    pub fn build_switch_case(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::ItemPtr<model::SwitchCase> {
+    pub fn build_switch_case(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::ItemPtr<model::SwitchCaseData> {
         self.build_item(src, range, |m| &mut m.switch_cases, |_v, mb| {
-            model::SwitchCase {
+            model::SwitchCaseData {
                 exp: mb.build_expression(src, range),
             }
         })
     }
             
-    pub fn build_switch_default(&mut self, range: &ParsedRange) -> model::ItemPtr<model::SwitchDefault> {
+    pub fn build_switch_default(&mut self, range: &ParsedRange) -> model::ItemPtr<model::SwitchDefaultData> {
         self.build_item(&(), range, |m| &mut m.switch_defaults, |_v, _mb| {
-            model::SwitchDefault {
+            model::SwitchDefaultData {
             }
         })
     }
             
-    pub fn build_var_decl_statement(&mut self, src: &ast::VarDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::VarDeclStatement> {
+    pub fn build_var_decl_statement(&mut self, src: &ast::VarDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::VarDeclStatementData> {
         self.build_item(src, range, |m| &mut m.var_decl_statements, |v, mb| {
-            model::VarDeclStatement {
+            model::VarDeclStatementData {
                 let_or_const: mb.build_let_or_const(&v.let_or_const.value),
                 name: v.name.value.clone(),
                 init: v.init.as_ref().map(|v| mb.build_expression(&v.value, &v.range)),
@@ -234,9 +234,9 @@ impl<'a> ModelBuilder<'a> {
         }
     }
             
-    pub fn build_function_decl_statement(&mut self, src: &ast::FunctionDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclStatement> {
+    pub fn build_function_decl_statement(&mut self, src: &ast::FunctionDeclStatement, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclStatementData> {
         self.build_item(src, range, |m| &mut m.function_decl_statements, |v, mb| {
-            model::FunctionDeclStatement {
+            model::FunctionDeclStatementData {
                 name: v.name.value.clone(),
                 signature: mb.build_function_signature(&v.signature.value, &v.signature.range),
                 body: mb.build_statement(&v.body.value, &v.body.range),
@@ -244,34 +244,34 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_function_signature(&mut self, src: &ast::FunctionSignature, range: &ParsedRange) -> model::ItemPtr<model::FunctionSignature> {
+    pub fn build_function_signature(&mut self, src: &ast::FunctionSignature, range: &ParsedRange) -> model::ItemPtr<model::FunctionSignatureData> {
         self.build_item(src, range, |m| &mut m.function_signatures, |v, mb| {
-            model::FunctionSignature {
+            model::FunctionSignatureData {
                 args: v.args.value.iter().map(|v| mb.build_function_decl_arg(&v.value, &v.range)).collect(),
             }
         })
     }
             
-    pub fn build_function_decl_arg(&mut self, src: &ast::FunctionDeclArg, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclArg> {
+    pub fn build_function_decl_arg(&mut self, src: &ast::FunctionDeclArg, range: &ParsedRange) -> model::ItemPtr<model::FunctionDeclArgData> {
         self.build_item(src, range, |m| &mut m.function_decl_args, |v, _mb| {
-            model::FunctionDeclArg {
+            model::FunctionDeclArgData {
                 name: v.name.value.clone(),
             }
         })
     }
             
-    pub fn build_labeled_statement(&mut self, src: &ast::LabeledStatement, range: &ParsedRange) -> model::ItemPtr<model::LabeledStatement> {
+    pub fn build_labeled_statement(&mut self, src: &ast::LabeledStatement, range: &ParsedRange) -> model::ItemPtr<model::LabeledStatementData> {
         self.build_item(src, range, |m| &mut m.labeled_statements, |v, mb| {
-            model::LabeledStatement {
+            model::LabeledStatementData {
                 name: src.name.value.clone(),
                 stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
     }
             
-    pub fn build_try_statement(&mut self, src: &ast::TryStatement, range: &ParsedRange) -> model::ItemPtr<model::TryStatement> {
+    pub fn build_try_statement(&mut self, src: &ast::TryStatement, range: &ParsedRange) -> model::ItemPtr<model::TryStatementData> {
         self.build_item(src, range, |m| &mut m.try_statements, |v, mb| {
-            model::TryStatement {
+            model::TryStatementData {
                 stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
                 catch_clause: v.catch_clause.as_ref().map(|v| mb.build_catch_clause(&v.value, &v.range)),
                 finally_clause: v.finally_clause.as_ref().map(|v| mb.build_statement(&v.value, &v.range)),
@@ -279,51 +279,51 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_catch_clause(&mut self, src: &ast::CatchClause, range: &ParsedRange) -> model::ItemPtr<model::CatchClause> {
+    pub fn build_catch_clause(&mut self, src: &ast::CatchClause, range: &ParsedRange) -> model::ItemPtr<model::CatchClauseData> {
         self.build_item(src, range, |m| &mut m.catch_clauses, |v, mb| {
-            model::CatchClause {
+            model::CatchClauseData {
                 name: src.name.as_ref().map(|v| v.value.clone()),
                 stmt: mb.build_statement(&v.stmt.value, &v.stmt.range),
             }
         })
     }
             
-    pub fn build_expression(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::Expression {
+    pub fn build_expression(&mut self, src: &ast::Expression, range: &ParsedRange) -> model::ExpressionData {
             match src {
-                ast::Expression::CommaExpression(a) => model::Expression::CommaExpression(self.build_comma_expression(&a, range)),
-                ast::Expression::TernaryExpression(a) => model::Expression::TernaryExpression(self.build_ternary_expression(&a, range)),
-                ast::Expression::BinaryExpression(a) => model::Expression::BinaryExpression(self.build_binary_expression(&a, range)),
-                ast::Expression::UnaryExpression(a) => model::Expression::UnaryExpression(self.build_unary_expression(&a, range)),
-                ast::Expression::BooleanLiteral(a) => model::Expression::BooleanLiteral(self.build_boolean_literal(&a, range)),
-                ast::Expression::NullLiteral => model::Expression::NullLiteral(self.build_null_literal(range)),
-                ast::Expression::StringLiteral(a) => model::Expression::StringLiteral(self.build_string_literal(&a, range)),
-                ast::Expression::IntLiteral(a) => model::Expression::IntLiteral(self.build_int_literal(&a, range)),
+                ast::Expression::CommaExpression(a) => model::ExpressionData::CommaExpression(self.build_comma_expression(&a, range)),
+                ast::Expression::TernaryExpression(a) => model::ExpressionData::TernaryExpression(self.build_ternary_expression(&a, range)),
+                ast::Expression::BinaryExpression(a) => model::ExpressionData::BinaryExpression(self.build_binary_expression(&a, range)),
+                ast::Expression::UnaryExpression(a) => model::ExpressionData::UnaryExpression(self.build_unary_expression(&a, range)),
+                ast::Expression::BooleanLiteral(a) => model::ExpressionData::BooleanLiteral(self.build_boolean_literal(&a, range)),
+                ast::Expression::NullLiteral => model::ExpressionData::NullLiteral(self.build_null_literal(range)),
+                ast::Expression::StringLiteral(a) => model::ExpressionData::StringLiteral(self.build_string_literal(&a, range)),
+                ast::Expression::IntLiteral(a) => model::ExpressionData::IntLiteral(self.build_int_literal(&a, range)),
                 ast::Expression::MemberExpression(a) => self.build_member_expression(&a, range),
-                ast::Expression::IdentifierExpression(a) => model::Expression::IdentifierExpression(self.build_identifier_expression(&a, range)),
+                ast::Expression::IdentifierExpression(a) => model::ExpressionData::IdentifierExpression(self.build_identifier_expression(&a, range)),
             }
     }
             
-    pub fn build_comma_expression(&mut self, src: &ast::CommaExpression, range: &ParsedRange) -> model::ItemPtr<model::CommaExpression> {
+    pub fn build_comma_expression(&mut self, src: &ast::CommaExpression, range: &ParsedRange) -> model::ItemPtr<model::CommaExpressionData> {
         self.build_item(src, range, |m| &mut m.comma_expressions, |v, mb| {
-            model::CommaExpression {
+            model::CommaExpressionData {
                 exps: v.exps.iter().map(|v| mb.build_expression(&v.value, &v.range)).collect()
             }
         })
     }
             
-    pub fn build_ternary_expression(&mut self, src: &ast::TernaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::TernaryExpression> {
+    pub fn build_ternary_expression(&mut self, src: &ast::TernaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::TernaryExpressionData> {
         let if_false = self.build_expression(&src.if_false.value, &src.if_false.range);
         self.build_one_ternary_expression(&src.terms, 0, &if_false)
     }
             
-    pub fn build_one_ternary_expression(&mut self, terms: &Vec<Parsed<ast::TernaryExpressionTerm>>, ix: usize, if_false: &model::Expression) -> model::ItemPtr<model::TernaryExpression> {
+    pub fn build_one_ternary_expression(&mut self, terms: &Vec<Parsed<ast::TernaryExpressionTerm>>, ix: usize, if_false: &model::ExpressionData) -> model::ItemPtr<model::TernaryExpressionData> {
         let term = &terms.get(ix).unwrap().value;
         let test = self.build_expression(&term.test.value, &term.test.range);
         let if_true = self.build_expression(&term.if_true.value, &term.if_true.range);
         
         self.build_item(&(), &term.test.range, |m| &mut m.ternary_expressions, |_v, mb| {
             if ix == terms.len() - 1 {
-                model::TernaryExpression {
+                model::TernaryExpressionData {
                     test: test,
                     if_true: if_true,
                     if_false: *if_false,
@@ -331,8 +331,8 @@ impl<'a> ModelBuilder<'a> {
             }
             else {
                 let e = mb.build_one_ternary_expression(terms, ix + 1, if_false);
-                let eexp = model::Expression::TernaryExpression(e);
-                model::TernaryExpression {
+                let eexp = model::ExpressionData::TernaryExpression(e);
+                model::TernaryExpressionData {
                     test: test,
                     if_true: if_true,
                     if_false: eexp,
@@ -341,12 +341,12 @@ impl<'a> ModelBuilder<'a> {
         })
     }
             
-    pub fn build_binary_expression(&mut self, src: &ast::BinaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::BinaryExpression> {
+    pub fn build_binary_expression(&mut self, src: &ast::BinaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::BinaryExpressionData> {
         let first = self.build_expression(&src.first.value, &src.first.range);
         self.build_one_binary_expression(&src.rest, src.rest.len() - 1, &first)
     }
             
-    fn build_one_binary_expression(&mut self, terms: &Vec<Parsed<ast::BinaryExpressionTerm>>, ix: usize, first: &model::Expression) -> model::ItemPtr<model::BinaryExpression> {
+    fn build_one_binary_expression(&mut self, terms: &Vec<Parsed<ast::BinaryExpressionTerm>>, ix: usize, first: &model::ExpressionData) -> model::ItemPtr<model::BinaryExpressionData> {
         let term = &terms.get(ix).unwrap().value;
         let op = &term.op;
         let model_op = self.build_binary_op(&op.value);
@@ -354,7 +354,7 @@ impl<'a> ModelBuilder<'a> {
         
         self.build_item(&(), &op.range, |m| &mut m.binary_expressions, |_v, mb| {
             if ix == 0 {
-                model::BinaryExpression {
+                model::BinaryExpressionData {
                     left: *first,
                     op: model_op,
                     right,
@@ -363,8 +363,8 @@ impl<'a> ModelBuilder<'a> {
             else {
                 let e = mb.build_one_binary_expression(terms, ix - 1, first);
                 // Build an Expression around the UnaryExpression
-                let eexp = model::Expression::BinaryExpression(e);
-                model::BinaryExpression {
+                let eexp = model::ExpressionData::BinaryExpression(e);
+                model::BinaryExpressionData {
                     left: eexp,
                     op: model_op,
                     right: right,
@@ -411,17 +411,17 @@ impl<'a> ModelBuilder<'a> {
         }
     }
             
-    pub fn build_unary_expression(&mut self, src: &ast::UnaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::UnaryExpression> {
+    pub fn build_unary_expression(&mut self, src: &ast::UnaryExpression, _range: &ParsedRange) -> model::ItemPtr<model::UnaryExpressionData> {
         let exp = self.build_expression(&src.exp.value, &src.exp.range);
         self.build_one_unary_expression(&src.ops, 0, &exp)
     }
             
-    fn build_one_unary_expression(&mut self, ops: &Vec<Parsed<ast::UnaryOp>>, ix: usize, exp: &model::Expression) -> model::ItemPtr<model::UnaryExpression> {
+    fn build_one_unary_expression(&mut self, ops: &Vec<Parsed<ast::UnaryOp>>, ix: usize, exp: &model::ExpressionData) -> model::ItemPtr<model::UnaryExpressionData> {
         let op = ops.get(ix).unwrap();
         let model_op = self.build_unary_op(&op.value);
         self.build_item(&(), &op.range, |m| &mut m.unary_expressions, |_v, mb| {
             if ix == ops.len() - 1 {
-                model::UnaryExpression {
+                model::UnaryExpressionData {
                     op: model_op,
                     exp: *exp,
                 }
@@ -429,8 +429,8 @@ impl<'a> ModelBuilder<'a> {
             else {
                 let e = mb.build_one_unary_expression(ops, ix + 1, exp);
                 // Build an Expression around the UnaryExpression
-                let eexp = model::Expression::UnaryExpression(e);
-                model::UnaryExpression {
+                let eexp = model::ExpressionData::UnaryExpression(e);
+                model::UnaryExpressionData {
                     op: model_op,
                     exp: eexp,
                 }
@@ -447,32 +447,32 @@ impl<'a> ModelBuilder<'a> {
         }
     }
     
-    pub fn build_boolean_literal(&mut self, src: &bool, range: &ParsedRange) -> model::ItemPtr<model::BooleanLiteral> {
+    pub fn build_boolean_literal(&mut self, src: &bool, range: &ParsedRange) -> model::ItemPtr<model::BooleanLiteralData> {
         self.build_item(src, range, |m| &mut m.boolean_literals, |v, _mb| {
-            model::BooleanLiteral {
+            model::BooleanLiteralData {
                 value: *v,
             }
         })
     }
             
-    pub fn build_null_literal(&mut self, range: &ParsedRange) -> model::ItemPtr<model::NullLiteral> {
+    pub fn build_null_literal(&mut self, range: &ParsedRange) -> model::ItemPtr<model::NullLiteralData> {
         self.build_item(&(), range, |m| &mut m.null_literals, |_v, _mb| {
-            model::NullLiteral {
+            model::NullLiteralData {
             }
         })
     }
             
-    pub fn build_string_literal(&mut self, src: &String, range: &ParsedRange) -> model::ItemPtr<model::StringLiteral> {
+    pub fn build_string_literal(&mut self, src: &String, range: &ParsedRange) -> model::ItemPtr<model::StringLiteralData> {
         self.build_item(src, range, |m| &mut m.string_literals, |v, _mb| {
-            model::StringLiteral {
+            model::StringLiteralData {
                 value: v.clone(),
             }
         })
     }
             
-    pub fn build_int_literal(&mut self, src: &ast::IntLiteral, range: &ParsedRange) -> model::ItemPtr<model::IntLiteral> {
+    pub fn build_int_literal(&mut self, src: &ast::IntLiteral, range: &ParsedRange) -> model::ItemPtr<model::IntLiteralData> {
         self.build_item(src, range, |m| &mut m.int_literals, |v, mb| {
-            model::IntLiteral {
+            model::IntLiteralData {
                 value: v.value,
                 suffix: v.suffix.as_ref().map(|v| mb.build_int_literal_suffix(&v.value)),
             }
@@ -492,12 +492,12 @@ impl<'a> ModelBuilder<'a> {
         }
     }
             
-    pub fn build_member_expression(&mut self, src: &ast::MemberExpression, _range: &ParsedRange) -> model::Expression {
+    pub fn build_member_expression(&mut self, src: &ast::MemberExpression, _range: &ParsedRange) -> model::ExpressionData {
         let first = self.build_expression(&src.first.value, &src.first.range);
         self.build_one_member_expression(&src.rest, src.rest.len() - 1, &first)
     }
             
-    pub fn build_one_member_expression(&mut self, rest: &Vec<Parsed<ast::MemberOp>>, ix: usize, exp: &model::Expression) -> model::Expression {
+    pub fn build_one_member_expression(&mut self, rest: &Vec<Parsed<ast::MemberOp>>, ix: usize, exp: &model::ExpressionData) -> model::ExpressionData {
         let op = &rest.get(ix).unwrap();
 
         if ix == 0 {
@@ -509,53 +509,53 @@ impl<'a> ModelBuilder<'a> {
         }
     }
 
-    pub fn build_member_expression_op(&mut self, op: &Parsed<ast::MemberOp>, exp: &model::Expression) -> model::Expression {
+    pub fn build_member_expression_op(&mut self, op: &Parsed<ast::MemberOp>, exp: &model::ExpressionData) -> model::ExpressionData {
         match &op.value {
-            ast::MemberOp::DotAccess(v) => model::Expression::DotAccessExpression(self.build_dot_access_expression(v, &op.range, exp)),
-            ast::MemberOp::IndexAccess(v) => model::Expression::IndexAccessExpression(self.build_index_access_expression(v, &op.range, exp)),
-            ast::MemberOp::FunctionCall(v) => model::Expression::FunctionCallExpression(self.build_function_call_expression(v, &op.range, exp)),
-            ast::MemberOp::NonNullAssert => model::Expression::NonNullAssertExpression(self.build_non_null_assert_expression(&op.range, exp)),
+            ast::MemberOp::DotAccess(v) => model::ExpressionData::DotAccessExpression(self.build_dot_access_expression(v, &op.range, exp)),
+            ast::MemberOp::IndexAccess(v) => model::ExpressionData::IndexAccessExpression(self.build_index_access_expression(v, &op.range, exp)),
+            ast::MemberOp::FunctionCall(v) => model::ExpressionData::FunctionCallExpression(self.build_function_call_expression(v, &op.range, exp)),
+            ast::MemberOp::NonNullAssert => model::ExpressionData::NonNullAssertExpression(self.build_non_null_assert_expression(&op.range, exp)),
         }
     }
 
-    pub fn build_dot_access_expression(&mut self, src: &ast::DotAccess, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::DotAccessExpression> {
+    pub fn build_dot_access_expression(&mut self, src: &ast::DotAccess, range: &ParsedRange, exp: &model::ExpressionData) -> model::ItemPtr<model::DotAccessExpressionData> {
         self.build_item(src, range, |m| &mut m.dot_access_expressions, |v, _mb| {
-            model::DotAccessExpression {
+            model::DotAccessExpressionData {
                 exp: *exp,
                 name: v.name.value.clone(),
             }
         })
     }
 
-    pub fn build_index_access_expression(&mut self, src: &ast::IndexAccess, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::IndexAccessExpression> {
+    pub fn build_index_access_expression(&mut self, src: &ast::IndexAccess, range: &ParsedRange, exp: &model::ExpressionData) -> model::ItemPtr<model::IndexAccessExpressionData> {
         self.build_item(src, range, |m| &mut m.index_access_expressions, |v, mb| {
-            model::IndexAccessExpression {
+            model::IndexAccessExpressionData {
                 exp: *exp,
                 access_exp: mb.build_expression(&v.exp.value, &v.exp.range),
             }
         })
     }
 
-    pub fn build_function_call_expression(&mut self, src: &ast::FunctionCall, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::FunctionCallExpression> {
+    pub fn build_function_call_expression(&mut self, src: &ast::FunctionCall, range: &ParsedRange, exp: &model::ExpressionData) -> model::ItemPtr<model::FunctionCallExpressionData> {
         self.build_item(src, range, |m| &mut m.function_call_expressions, |v, mb| {
-            model::FunctionCallExpression {
+            model::FunctionCallExpressionData {
                 exp: *exp,
                 args: v.args.value.iter().map(|v| mb.build_expression(&v.value, &v.range)).collect(),
             }
         })
     }
 
-    pub fn build_non_null_assert_expression(&mut self, range: &ParsedRange, exp: &model::Expression) -> model::ItemPtr<model::NonNullAssertExpression> {
+    pub fn build_non_null_assert_expression(&mut self, range: &ParsedRange, exp: &model::ExpressionData) -> model::ItemPtr<model::NonNullAssertExpressionData> {
         self.build_item(&(), range, |m| &mut m.non_null_assert_expressions, |_v, _mb| {
-            model::NonNullAssertExpression {
+            model::NonNullAssertExpressionData {
                 exp: *exp,
             }
         })
     }
             
-    pub fn build_identifier_expression(&mut self, src: &ast::IdentifierExpression, range: &ParsedRange) -> model::ItemPtr<model::IdentifierExpression> {
+    pub fn build_identifier_expression(&mut self, src: &ast::IdentifierExpression, range: &ParsedRange) -> model::ItemPtr<model::IdentifierExpressionData> {
         self.build_item(src, range, |m| &mut m.identifier_expressions, |v, _mb| {
-            model::IdentifierExpression {
+            model::IdentifierExpressionData {
                 name: v.name.clone(),
             }
         })

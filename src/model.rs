@@ -1,5 +1,9 @@
 use std::{collections::HashMap, marker::PhantomData};
 
+//==================================================
+// Section 1: Generic model machinery
+//==================================================
+
 pub enum ModelError {
     TypeMismatch(&'static str)
 }
@@ -11,42 +15,42 @@ pub struct Model {
     pub span_table: HashMap<ItemKey, SourceLocation>,
 
     // Dense arrays of each item type
-    pub files: ModelItems<File>,
-    pub type_decls: ModelItems<TypeDecl>,
-    pub import_decls: ModelItems<ImportDecl>,
-    pub empty_statements: ModelItems<EmptyStatement>,
-    pub expression_statements: ModelItems<ExpressionStatement>,
-    pub if_statements: ModelItems<IfStatement>,
-    pub while_statements: ModelItems<WhileStatement>,
-    pub return_statements: ModelItems<ReturnStatement>,
-    pub break_statements: ModelItems<BreakStatement>,
-    pub continue_statements: ModelItems<ContinueStatement>,
-    pub block_statements: ModelItems<BlockStatement>,
-    pub for_statements: ModelItems<ForStatement>,
-    pub switch_statements: ModelItems<SwitchStatement>,
-    pub switch_body_statements: ModelItems<SwitchBodyStatement>,
-    pub switch_cases: ModelItems<SwitchCase>,
-    pub switch_defaults: ModelItems<SwitchDefault>,
-    pub var_decl_statements: ModelItems<VarDeclStatement>,
-    pub function_decl_statements: ModelItems<FunctionDeclStatement>,
-    pub function_signatures: ModelItems<FunctionSignature>,
-    pub function_decl_args: ModelItems<FunctionDeclArg>,
-    pub labeled_statements: ModelItems<LabeledStatement>,
-    pub try_statements: ModelItems<TryStatement>,
-    pub catch_clauses: ModelItems<CatchClause>,
-    pub comma_expressions: ModelItems<CommaExpression>,
-    pub ternary_expressions: ModelItems<TernaryExpression>,
-    pub binary_expressions: ModelItems<BinaryExpression>,
-    pub unary_expressions: ModelItems<UnaryExpression>,
-    pub boolean_literals: ModelItems<BooleanLiteral>,
-    pub null_literals: ModelItems<NullLiteral>,
-    pub string_literals: ModelItems<StringLiteral>,
-    pub int_literals: ModelItems<IntLiteral>,
-    pub dot_access_expressions: ModelItems<DotAccessExpression>,
-    pub index_access_expressions: ModelItems<IndexAccessExpression>,
-    pub function_call_expressions: ModelItems<FunctionCallExpression>,
-    pub non_null_assert_expressions: ModelItems<NonNullAssertExpression>,
-    pub identifier_expressions: ModelItems<IdentifierExpression>,
+    pub files: ModelItems<FileData>,
+    pub type_decls: ModelItems<TypeDeclData>,
+    pub import_decls: ModelItems<ImportDeclData>,
+    pub empty_statements: ModelItems<EmptyStatementData>,
+    pub expression_statements: ModelItems<ExpressionStatementData>,
+    pub if_statements: ModelItems<IfStatementData>,
+    pub while_statements: ModelItems<WhileStatementData>,
+    pub return_statements: ModelItems<ReturnStatementData>,
+    pub break_statements: ModelItems<BreakStatementData>,
+    pub continue_statements: ModelItems<ContinueStatementData>,
+    pub block_statements: ModelItems<BlockStatementData>,
+    pub for_statements: ModelItems<ForStatementData>,
+    pub switch_statements: ModelItems<SwitchStatementData>,
+    pub switch_body_statements: ModelItems<SwitchBodyStatementData>,
+    pub switch_cases: ModelItems<SwitchCaseData>,
+    pub switch_defaults: ModelItems<SwitchDefaultData>,
+    pub var_decl_statements: ModelItems<VarDeclStatementData>,
+    pub function_decl_statements: ModelItems<FunctionDeclStatementData>,
+    pub function_signatures: ModelItems<FunctionSignatureData>,
+    pub function_decl_args: ModelItems<FunctionDeclArgData>,
+    pub labeled_statements: ModelItems<LabeledStatementData>,
+    pub try_statements: ModelItems<TryStatementData>,
+    pub catch_clauses: ModelItems<CatchClauseData>,
+    pub comma_expressions: ModelItems<CommaExpressionData>,
+    pub ternary_expressions: ModelItems<TernaryExpressionData>,
+    pub binary_expressions: ModelItems<BinaryExpressionData>,
+    pub unary_expressions: ModelItems<UnaryExpressionData>,
+    pub boolean_literals: ModelItems<BooleanLiteralData>,
+    pub null_literals: ModelItems<NullLiteralData>,
+    pub string_literals: ModelItems<StringLiteralData>,
+    pub int_literals: ModelItems<IntLiteralData>,
+    pub dot_access_expressions: ModelItems<DotAccessExpressionData>,
+    pub index_access_expressions: ModelItems<IndexAccessExpressionData>,
+    pub function_call_expressions: ModelItems<FunctionCallExpressionData>,
+    pub non_null_assert_expressions: ModelItems<NonNullAssertExpressionData>,
+    pub identifier_expressions: ModelItems<IdentifierExpressionData>,
 }
 
 impl Model {
@@ -54,7 +58,7 @@ impl Model {
         Self {
             source_files: SourceFiles::new(),
             span_table: HashMap::new(),
-            
+
             files: ModelItems::new(ItemKind::File),
             type_decls: ModelItems::new(ItemKind::TypeDecl),
             import_decls: ModelItems::new(ItemKind::ImportDecl),
@@ -118,6 +122,10 @@ impl<T> ModelItems<T> {
             _marker: PhantomData,
         }
     }
+
+    pub fn get(&self, id: usize) -> &T {
+        self.items.get(id).unwrap()
+    }
 }
 
 //--------------------------------------------------
@@ -166,6 +174,8 @@ pub struct Span {
     pub end: usize,
 }
 
+//--------------------------------------------------
+// Item pointers
 
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
 pub enum ItemKind {
@@ -233,142 +243,240 @@ impl<T> ItemPtr<T> {
     }
 }
 
-// Type-erased version of a ptr, for use in tables
+// Type-erased version of a ptr, for use as a key in hash tables
 #[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
 pub struct ItemKey {
     kind: ItemKind,
     id: usize,
 }
 
+//--------------------------------------------------
+// Item handles
+//
+// A handle is just (model, ptr). The stored data lives in `*Data` structs; the
+// clean domain name (e.g. `BlockStatement`) is a type alias for the handle, so
+// callers work with `BlockStatement<'a>` and never touch `BlockStatementData`
+// directly.
+
+pub struct Item<'a, T> {
+    model: &'a Model,
+    ptr: ItemPtr<T>,
+}
+
+// Handles are just (model, ptr) so they're cheap to copy around.
+// Derived manually so we don't require T: Clone/Copy.
+impl<'a, T> Clone for Item<'a, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+impl<'a, T> Copy for Item<'a, T> {}
+
+/// Maps a marker type `T` (the `*Data` struct) to the dense array that stores
+/// it on the `Model`. This is the one bit of glue that lets a handle find its
+/// own data.
+pub trait ModelItem: Sized {
+    fn collection(model: &Model) -> &ModelItems<Self>;
+}
+
+impl Model {
+    /// Wrap a ptr into a handle that can answer questions about the item.
+    pub fn item<T: ModelItem>(&self, ptr: ItemPtr<T>) -> Item<'_, T> {
+        Item { model: self, ptr }
+    }
+}
+
+impl<'a, T: ModelItem> Item<'a, T> {
+    /// The underlying stored data. Borrow is tied to the model (`'a`), not to
+    /// `self`, so accessors can hand back `&'a` data and owned child handles.
+    pub fn data(&self) -> &'a T {
+        T::collection(self.model).get(self.ptr.id)
+    }
+
+    pub fn model(&self) -> &'a Model {
+        self.model
+    }
+
+    pub fn ptr(&self) -> ItemPtr<T> {
+        self.ptr
+    }
+}
+
+//--------------------------------------------------
+// Macros that generate the domain layer.
+
+// (1) For each `Domain => DomainData => field`, generate:
+//       * the domain-name type alias  (`pub type Domain<'a> = Item<'a, DomainData>`)
+//       * the `ModelItem` impl that locates `DomainData`'s dense array.
+//     `macro_rules!` can't build `DomainData` from `Domain`, so we spell both.
+macro_rules! model_items {
+    ($($domain:ident => $data:ident => $field:ident),* $(,)?) => {
+        $(
+            pub type $domain<'a> = Item<'a, $data>;
+
+            impl ModelItem for $data {
+                fn collection(model: &Model) -> &ModelItems<Self> {
+                    &model.$field
+                }
+            }
+        )*
+    };
+}
+
+// (2) An enum-handle mirroring a *pure-ptr* dispatch enum whose variant names
+// match the item type names (e.g. `StatementData::BlockStatement(ItemPtr<BlockStatementData>)`).
+// `$src::$domain` reconstructs the source arm and `$domain<'a>` is the handle.
+// Dispatch enums with renamed or non-ptr variants are written by hand instead.
+macro_rules! enum_handle {
+    ($handle:ident from $src:ident { $($variant:ident => $domain:ident),* $(,)? }) => {
+        #[derive(Clone, Copy)]
+        pub enum $handle<'a> {
+            $($variant($domain<'a>),)*
+        }
+
+        impl<'a> $handle<'a> {
+            pub fn new(model: &'a Model, value: $src) -> Self {
+                match value {
+                    $($src::$domain(p) => Self::$variant(model.item(p)),)*
+                }
+            }
+        }
+    };
+}
+
+//==================================================
+// Section 2: Stored data (`*Data`)
+//==================================================
+
 #[derive(Debug)]
-pub struct File {
-    pub items: Vec<FileItem>
+pub struct FileData {
+    pub items: Vec<FileItemData>
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum FileItem {
-    ImportDecl(ItemPtr<ImportDecl>),
-    TypeDecl(ItemPtr<TypeDecl>),
-    Statement(Statement),
+pub enum FileItemData {
+    ImportDecl(ItemPtr<ImportDeclData>),
+    TypeDecl(ItemPtr<TypeDeclData>),
+    Statement(StatementData),
 }
 
 #[derive(Debug)]
-pub struct TypeDecl {
+pub struct TypeDeclData {
     // FIXME - implement this
 }
 
 #[derive(Debug)]
-pub struct ImportDecl {
+pub struct ImportDeclData {
     pub name: String,
     pub source: String,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Statement {
-    EmptyStatement(ItemPtr<EmptyStatement>),
-    ExpressionStatement(ItemPtr<ExpressionStatement>),
-    IfStatement(ItemPtr<IfStatement>),
-    WhileStatement(ItemPtr<WhileStatement>),
-    ReturnStatement(ItemPtr<ReturnStatement>),
-    BreakStatement(ItemPtr<BreakStatement>),
-    ContinueStatement(ItemPtr<ContinueStatement>),
-    BlockStatement(ItemPtr<BlockStatement>),
-    ForStatement(ItemPtr<ForStatement>),
-    SwitchStatement(ItemPtr<SwitchStatement>),
-    VarDeclStatement(ItemPtr<VarDeclStatement>),
-    FunctionDeclStatement(ItemPtr<FunctionDeclStatement>),
-    LabeledStatement(ItemPtr<LabeledStatement>),
-    TryStatement(ItemPtr<TryStatement>),
+pub enum StatementData {
+    EmptyStatement(ItemPtr<EmptyStatementData>),
+    ExpressionStatement(ItemPtr<ExpressionStatementData>),
+    IfStatement(ItemPtr<IfStatementData>),
+    WhileStatement(ItemPtr<WhileStatementData>),
+    ReturnStatement(ItemPtr<ReturnStatementData>),
+    BreakStatement(ItemPtr<BreakStatementData>),
+    ContinueStatement(ItemPtr<ContinueStatementData>),
+    BlockStatement(ItemPtr<BlockStatementData>),
+    ForStatement(ItemPtr<ForStatementData>),
+    SwitchStatement(ItemPtr<SwitchStatementData>),
+    VarDeclStatement(ItemPtr<VarDeclStatementData>),
+    FunctionDeclStatement(ItemPtr<FunctionDeclStatementData>),
+    LabeledStatement(ItemPtr<LabeledStatementData>),
+    TryStatement(ItemPtr<TryStatementData>),
 }
 
 #[derive(Debug)]
-pub struct EmptyStatement {
+pub struct EmptyStatementData {
 }
 
 #[derive(Debug)]
-pub struct ExpressionStatement {
-    pub exp: Expression,
+pub struct ExpressionStatementData {
+    pub exp: ExpressionData,
 }
 
 #[derive(Debug)]
-pub struct IfStatement {
-    pub test: Expression,
-    pub if_true: Statement,
-    pub if_false: Option<Statement>,
+pub struct IfStatementData {
+    pub test: ExpressionData,
+    pub if_true: StatementData,
+    pub if_false: Option<StatementData>,
 }
 
 #[derive(Debug)]
-pub struct WhileStatement {
-    pub test: Expression,
-    pub stmt: Statement,
+pub struct WhileStatementData {
+    pub test: ExpressionData,
+    pub stmt: StatementData,
 }
 
 #[derive(Debug)]
-pub struct ReturnStatement {
-    pub exp: Option<Expression>,
+pub struct ReturnStatementData {
+    pub exp: Option<ExpressionData>,
 }
 
 #[derive(Debug)]
-pub struct BreakStatement {
+pub struct BreakStatementData {
     pub label: Option<String>
 }
 
 #[derive(Debug)]
-pub struct ContinueStatement {
+pub struct ContinueStatementData {
     pub label: Option<String>
 }
 
 #[derive(Debug)]
-pub struct BlockStatement {
-    pub stmts: Vec<Statement>
+pub struct BlockStatementData {
+    pub stmts: Vec<StatementData>
 }
 
 #[derive(Debug)]
-pub struct ForStatement {
-    pub init: Option<ForInit>,
-    pub test: Option<Expression>,
-    pub advance: Option<Expression>,
-    pub stmt: Statement
+pub struct ForStatementData {
+    pub init: Option<ForInitData>,
+    pub test: Option<ExpressionData>,
+    pub advance: Option<ExpressionData>,
+    pub stmt: StatementData
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum ForInitData {
+    Expression(ExpressionData),
+    VarDecl(StatementData),
 }
 
 #[derive(Debug)]
-pub enum ForInit {
-    Expression(Expression),
-    VarDecl(Statement),
+pub struct SwitchStatementData {
+    pub exp: ExpressionData,
+    pub items: Vec<SwitchItemData>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SwitchItemData {
+    Statement(ItemPtr<SwitchBodyStatementData>),
+    Case(ItemPtr<SwitchCaseData>),
+    Default(ItemPtr<SwitchDefaultData>),
 }
 
 #[derive(Debug)]
-pub struct SwitchStatement {
-    pub exp: Expression,
-    pub items: Vec<SwitchItem>,
+pub struct SwitchBodyStatementData {
+    pub stmt: StatementData,
 }
 
 #[derive(Debug)]
-pub enum SwitchItem {
-    Statement(ItemPtr<SwitchBodyStatement>),
-    Case(ItemPtr<SwitchCase>),
-    Default(ItemPtr<SwitchDefault>),
+pub struct SwitchCaseData {
+    pub exp: ExpressionData,
 }
 
 #[derive(Debug)]
-pub struct SwitchBodyStatement {
-    pub stmt: Statement,
+pub struct SwitchDefaultData {
 }
 
 #[derive(Debug)]
-pub struct SwitchCase {
-    pub exp: Expression,
-}
-
-#[derive(Debug)]
-pub struct SwitchDefault {
-}
-
-#[derive(Debug)]
-pub struct VarDeclStatement {
+pub struct VarDeclStatementData {
     pub let_or_const: LetOrConst,
     pub name: String,
-    pub init: Option<Expression>,
+    pub init: Option<ExpressionData>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -378,75 +486,75 @@ pub enum LetOrConst {
 }
 
 #[derive(Debug)]
-pub struct FunctionDeclStatement {
+pub struct FunctionDeclStatementData {
     pub name: String,
-    pub signature: ItemPtr<FunctionSignature>,
-    pub body: Statement,
+    pub signature: ItemPtr<FunctionSignatureData>,
+    pub body: StatementData,
 }
 
 #[derive(Debug)]
-pub struct FunctionSignature {
-    pub args: Vec<ItemPtr<FunctionDeclArg>>,
+pub struct FunctionSignatureData {
+    pub args: Vec<ItemPtr<FunctionDeclArgData>>,
 }
 
 #[derive(Debug)]
-pub struct FunctionDeclArg {
+pub struct FunctionDeclArgData {
     pub name: String
 }
 
 #[derive(Debug)]
-pub struct LabeledStatement {
+pub struct LabeledStatementData {
     pub name: String,
-    pub stmt: Statement,
+    pub stmt: StatementData,
 }
 
 #[derive(Debug)]
-pub struct TryStatement {
-    pub stmt: Statement,
-    pub catch_clause: Option<ItemPtr<CatchClause>>,
-    pub finally_clause: Option<Statement>,
+pub struct TryStatementData {
+    pub stmt: StatementData,
+    pub catch_clause: Option<ItemPtr<CatchClauseData>>,
+    pub finally_clause: Option<StatementData>,
 }
 
 #[derive(Debug)]
-pub struct CatchClause {
+pub struct CatchClauseData {
     pub name: Option<String>,
-    pub stmt: Statement,
+    pub stmt: StatementData,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum Expression {
-    CommaExpression(ItemPtr<CommaExpression>),
-    TernaryExpression(ItemPtr<TernaryExpression>),
-    BinaryExpression(ItemPtr<BinaryExpression>),
-    UnaryExpression(ItemPtr<UnaryExpression>),
-    BooleanLiteral(ItemPtr<BooleanLiteral>),
-    NullLiteral(ItemPtr<NullLiteral>),
-    StringLiteral(ItemPtr<StringLiteral>),
-    IntLiteral(ItemPtr<IntLiteral>),
-    DotAccessExpression(ItemPtr<DotAccessExpression>),
-    IndexAccessExpression(ItemPtr<IndexAccessExpression>),
-    FunctionCallExpression(ItemPtr<FunctionCallExpression>),
-    NonNullAssertExpression(ItemPtr<NonNullAssertExpression>),
-    IdentifierExpression(ItemPtr<IdentifierExpression>),
+pub enum ExpressionData {
+    CommaExpression(ItemPtr<CommaExpressionData>),
+    TernaryExpression(ItemPtr<TernaryExpressionData>),
+    BinaryExpression(ItemPtr<BinaryExpressionData>),
+    UnaryExpression(ItemPtr<UnaryExpressionData>),
+    BooleanLiteral(ItemPtr<BooleanLiteralData>),
+    NullLiteral(ItemPtr<NullLiteralData>),
+    StringLiteral(ItemPtr<StringLiteralData>),
+    IntLiteral(ItemPtr<IntLiteralData>),
+    DotAccessExpression(ItemPtr<DotAccessExpressionData>),
+    IndexAccessExpression(ItemPtr<IndexAccessExpressionData>),
+    FunctionCallExpression(ItemPtr<FunctionCallExpressionData>),
+    NonNullAssertExpression(ItemPtr<NonNullAssertExpressionData>),
+    IdentifierExpression(ItemPtr<IdentifierExpressionData>),
 }
 
 #[derive(Debug)]
-pub struct CommaExpression {
-    pub exps: Vec<Expression>
+pub struct CommaExpressionData {
+    pub exps: Vec<ExpressionData>
 }
 
 #[derive(Debug)]
-pub struct TernaryExpression {
-    pub test: Expression,
-    pub if_true: Expression,
-    pub if_false: Expression,
+pub struct TernaryExpressionData {
+    pub test: ExpressionData,
+    pub if_true: ExpressionData,
+    pub if_false: ExpressionData,
 }
 
 #[derive(Debug)]
-pub struct BinaryExpression {
-    pub left: Expression,
+pub struct BinaryExpressionData {
+    pub left: ExpressionData,
     pub op: BinaryOp,
-    pub right: Expression,
+    pub right: ExpressionData,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -488,9 +596,9 @@ pub enum BinaryOp {
 }
 
 #[derive(Debug)]
-pub struct UnaryExpression {
+pub struct UnaryExpressionData {
     pub op: UnaryOp,
-    pub exp: Expression
+    pub exp: ExpressionData
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -502,21 +610,21 @@ pub enum UnaryOp {
 }
 
 #[derive(Debug)]
-pub struct BooleanLiteral {
+pub struct BooleanLiteralData {
     pub value: bool
 }
 
 #[derive(Debug)]
-pub struct NullLiteral {
+pub struct NullLiteralData {
 }
 
 #[derive(Debug)]
-pub struct StringLiteral {
+pub struct StringLiteralData {
     pub value: String
 }
 
 #[derive(Debug)]
-pub struct IntLiteral {
+pub struct IntLiteralData {
     pub value: u64,
     pub suffix: Option<IntLiteralSuffix>,
 }
@@ -534,29 +642,427 @@ pub enum IntLiteralSuffix {
 }
 
 #[derive(Debug)]
-pub struct DotAccessExpression {
-    pub exp: Expression,
+pub struct DotAccessExpressionData {
+    pub exp: ExpressionData,
     pub name: String,
 }
 
 #[derive(Debug)]
-pub struct IndexAccessExpression {
-    pub exp: Expression,
-    pub access_exp: Expression,
+pub struct IndexAccessExpressionData {
+    pub exp: ExpressionData,
+    pub access_exp: ExpressionData,
 }
 
 #[derive(Debug)]
-pub struct FunctionCallExpression {
-    pub exp: Expression,
-    pub args: Vec<Expression>,
+pub struct FunctionCallExpressionData {
+    pub exp: ExpressionData,
+    pub args: Vec<ExpressionData>,
 }
 
 #[derive(Debug)]
-pub struct NonNullAssertExpression {
-    pub exp: Expression,
+pub struct NonNullAssertExpressionData {
+    pub exp: ExpressionData,
 }
 
 #[derive(Debug)]
-pub struct IdentifierExpression {
+pub struct IdentifierExpressionData {
     pub name: String
+}
+
+//==================================================
+// Section 3: Domain model objects
+//==================================================
+
+// Domain type aliases + `ModelItem` glue, one line per item type. Adding a new
+// item type is an edit here plus its `*Data` struct in Section 2.
+model_items! {
+    File                    => FileData                    => files,
+    TypeDecl                => TypeDeclData                => type_decls,
+    ImportDecl              => ImportDeclData              => import_decls,
+    EmptyStatement          => EmptyStatementData          => empty_statements,
+    ExpressionStatement     => ExpressionStatementData     => expression_statements,
+    IfStatement             => IfStatementData             => if_statements,
+    WhileStatement          => WhileStatementData          => while_statements,
+    ReturnStatement         => ReturnStatementData         => return_statements,
+    BreakStatement          => BreakStatementData          => break_statements,
+    ContinueStatement       => ContinueStatementData       => continue_statements,
+    BlockStatement          => BlockStatementData          => block_statements,
+    ForStatement            => ForStatementData            => for_statements,
+    SwitchStatement         => SwitchStatementData         => switch_statements,
+    SwitchBodyStatement     => SwitchBodyStatementData     => switch_body_statements,
+    SwitchCase              => SwitchCaseData              => switch_cases,
+    SwitchDefault           => SwitchDefaultData           => switch_defaults,
+    VarDeclStatement        => VarDeclStatementData        => var_decl_statements,
+    FunctionDeclStatement   => FunctionDeclStatementData   => function_decl_statements,
+    FunctionSignature       => FunctionSignatureData       => function_signatures,
+    FunctionDeclArg         => FunctionDeclArgData         => function_decl_args,
+    LabeledStatement        => LabeledStatementData        => labeled_statements,
+    TryStatement            => TryStatementData            => try_statements,
+    CatchClause             => CatchClauseData             => catch_clauses,
+    CommaExpression         => CommaExpressionData         => comma_expressions,
+    TernaryExpression       => TernaryExpressionData       => ternary_expressions,
+    BinaryExpression        => BinaryExpressionData        => binary_expressions,
+    UnaryExpression         => UnaryExpressionData         => unary_expressions,
+    BooleanLiteral          => BooleanLiteralData          => boolean_literals,
+    NullLiteral             => NullLiteralData             => null_literals,
+    StringLiteral           => StringLiteralData           => string_literals,
+    IntLiteral              => IntLiteralData              => int_literals,
+    DotAccessExpression     => DotAccessExpressionData     => dot_access_expressions,
+    IndexAccessExpression   => IndexAccessExpressionData   => index_access_expressions,
+    FunctionCallExpression  => FunctionCallExpressionData  => function_call_expressions,
+    NonNullAssertExpression => NonNullAssertExpressionData => non_null_assert_expressions,
+    IdentifierExpression    => IdentifierExpressionData    => identifier_expressions,
+}
+
+// Pure-ptr dispatch enums whose variant names match the item types.
+enum_handle! {
+    Statement from StatementData {
+        Empty        => EmptyStatement,
+        Expression   => ExpressionStatement,
+        If           => IfStatement,
+        While        => WhileStatement,
+        Return       => ReturnStatement,
+        Break        => BreakStatement,
+        Continue     => ContinueStatement,
+        Block        => BlockStatement,
+        For          => ForStatement,
+        Switch       => SwitchStatement,
+        VarDecl      => VarDeclStatement,
+        FunctionDecl => FunctionDeclStatement,
+        Labeled      => LabeledStatement,
+        Try          => TryStatement,
+    }
+}
+
+enum_handle! {
+    Expression from ExpressionData {
+        Comma         => CommaExpression,
+        Ternary       => TernaryExpression,
+        Binary        => BinaryExpression,
+        Unary         => UnaryExpression,
+        Boolean       => BooleanLiteral,
+        Null          => NullLiteral,
+        String        => StringLiteral,
+        Int           => IntLiteral,
+        DotAccess     => DotAccessExpression,
+        IndexAccess   => IndexAccessExpression,
+        FunctionCall  => FunctionCallExpression,
+        NonNullAssert => NonNullAssertExpression,
+        Identifier    => IdentifierExpression,
+    }
+}
+
+// Irregular dispatch enums: renamed variants and/or non-ptr payloads, so the
+// macro doesn't fit — written by hand.
+
+#[derive(Clone, Copy)]
+pub enum FileItem<'a> {
+    ImportDecl(ImportDecl<'a>),
+    TypeDecl(TypeDecl<'a>),
+    Statement(Statement<'a>),
+}
+
+impl<'a> FileItem<'a> {
+    pub fn new(model: &'a Model, value: FileItemData) -> Self {
+        match value {
+            FileItemData::ImportDecl(p) => Self::ImportDecl(model.item(p)),
+            FileItemData::TypeDecl(p) => Self::TypeDecl(model.item(p)),
+            FileItemData::Statement(s) => Self::Statement(Statement::new(model, s)),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum ForInit<'a> {
+    Expression(Expression<'a>),
+    VarDecl(Statement<'a>),
+}
+
+impl<'a> ForInit<'a> {
+    pub fn new(model: &'a Model, value: ForInitData) -> Self {
+        match value {
+            ForInitData::Expression(e) => Self::Expression(Expression::new(model, e)),
+            ForInitData::VarDecl(s) => Self::VarDecl(Statement::new(model, s)),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+pub enum SwitchItem<'a> {
+    Statement(SwitchBodyStatement<'a>),
+    Case(SwitchCase<'a>),
+    Default(SwitchDefault<'a>),
+}
+
+impl<'a> SwitchItem<'a> {
+    pub fn new(model: &'a Model, value: SwitchItemData) -> Self {
+        match value {
+            SwitchItemData::Statement(p) => Self::Statement(model.item(p)),
+            SwitchItemData::Case(p) => Self::Case(model.item(p)),
+            SwitchItemData::Default(p) => Self::Default(model.item(p)),
+        }
+    }
+}
+
+//--------------------------------------------------
+// Accessors — one impl per item type. Written on the domain alias.
+// These are the hand-written, domain-shaped layer; add domain logic here.
+
+impl<'a> File<'a> {
+    pub fn items(&self) -> impl Iterator<Item = FileItem<'a>> + 'a {
+        let model = self.model();
+        self.data().items.iter().map(move |&i| FileItem::new(model, i))
+    }
+}
+
+// TypeDecl: no fields yet (FIXME in TypeDeclData).
+
+impl<'a> ImportDecl<'a> {
+    pub fn name(&self) -> &'a str { &self.data().name }
+    pub fn source(&self) -> &'a str { &self.data().source }
+}
+
+// EmptyStatement: no fields.
+
+impl<'a> ExpressionStatement<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+}
+
+impl<'a> IfStatement<'a> {
+    pub fn test(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().test)
+    }
+    pub fn if_true(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().if_true)
+    }
+    pub fn if_false(&self) -> Option<Statement<'a>> {
+        let model = self.model();
+        self.data().if_false.map(|s| Statement::new(model, s))
+    }
+}
+
+impl<'a> WhileStatement<'a> {
+    pub fn test(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().test)
+    }
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+}
+
+impl<'a> ReturnStatement<'a> {
+    pub fn exp(&self) -> Option<Expression<'a>> {
+        let model = self.model();
+        self.data().exp.map(|e| Expression::new(model, e))
+    }
+}
+
+impl<'a> BreakStatement<'a> {
+    pub fn label(&self) -> Option<&'a str> {
+        self.data().label.as_deref()
+    }
+}
+
+impl<'a> ContinueStatement<'a> {
+    pub fn label(&self) -> Option<&'a str> {
+        self.data().label.as_deref()
+    }
+}
+
+impl<'a> BlockStatement<'a> {
+    pub fn stmts(&self) -> impl Iterator<Item = Statement<'a>> + 'a {
+        let model = self.model();
+        self.data().stmts.iter().map(move |&s| Statement::new(model, s))
+    }
+}
+
+impl<'a> ForStatement<'a> {
+    pub fn init(&self) -> Option<ForInit<'a>> {
+        let model = self.model();
+        self.data().init.map(|i| ForInit::new(model, i))
+    }
+    pub fn test(&self) -> Option<Expression<'a>> {
+        let model = self.model();
+        self.data().test.map(|e| Expression::new(model, e))
+    }
+    pub fn advance(&self) -> Option<Expression<'a>> {
+        let model = self.model();
+        self.data().advance.map(|e| Expression::new(model, e))
+    }
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+}
+
+impl<'a> SwitchStatement<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+    pub fn items(&self) -> impl Iterator<Item = SwitchItem<'a>> + 'a {
+        let model = self.model();
+        self.data().items.iter().map(move |&i| SwitchItem::new(model, i))
+    }
+}
+
+impl<'a> SwitchBodyStatement<'a> {
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+}
+
+impl<'a> SwitchCase<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+}
+
+// SwitchDefault: no fields.
+
+impl<'a> VarDeclStatement<'a> {
+    pub fn let_or_const(&self) -> LetOrConst { self.data().let_or_const }
+    pub fn name(&self) -> &'a str { &self.data().name }
+    pub fn init(&self) -> Option<Expression<'a>> {
+        let model = self.model();
+        self.data().init.map(|e| Expression::new(model, e))
+    }
+}
+
+impl<'a> FunctionDeclStatement<'a> {
+    pub fn name(&self) -> &'a str { &self.data().name }
+    pub fn signature(&self) -> FunctionSignature<'a> {
+        self.model().item(self.data().signature)
+    }
+    pub fn body(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().body)
+    }
+}
+
+impl<'a> FunctionSignature<'a> {
+    pub fn args(&self) -> impl Iterator<Item = FunctionDeclArg<'a>> + 'a {
+        let model = self.model();
+        self.data().args.iter().map(move |&ptr| model.item(ptr))
+    }
+}
+
+impl<'a> FunctionDeclArg<'a> {
+    pub fn name(&self) -> &'a str { &self.data().name }
+}
+
+impl<'a> LabeledStatement<'a> {
+    pub fn name(&self) -> &'a str { &self.data().name }
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+}
+
+impl<'a> TryStatement<'a> {
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+    pub fn catch_clause(&self) -> Option<CatchClause<'a>> {
+        let model = self.model();
+        self.data().catch_clause.map(|p| model.item(p))
+    }
+    pub fn finally_clause(&self) -> Option<Statement<'a>> {
+        let model = self.model();
+        self.data().finally_clause.map(|s| Statement::new(model, s))
+    }
+}
+
+impl<'a> CatchClause<'a> {
+    pub fn name(&self) -> Option<&'a str> {
+        self.data().name.as_deref()
+    }
+    pub fn stmt(&self) -> Statement<'a> {
+        Statement::new(self.model(), self.data().stmt)
+    }
+}
+
+impl<'a> CommaExpression<'a> {
+    pub fn exps(&self) -> impl Iterator<Item = Expression<'a>> + 'a {
+        let model = self.model();
+        self.data().exps.iter().map(move |&e| Expression::new(model, e))
+    }
+}
+
+impl<'a> TernaryExpression<'a> {
+    pub fn test(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().test)
+    }
+    pub fn if_true(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().if_true)
+    }
+    pub fn if_false(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().if_false)
+    }
+}
+
+impl<'a> BinaryExpression<'a> {
+    pub fn left(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().left)
+    }
+    pub fn op(&self) -> BinaryOp { self.data().op }
+    pub fn right(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().right)
+    }
+}
+
+impl<'a> UnaryExpression<'a> {
+    pub fn op(&self) -> UnaryOp { self.data().op }
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+}
+
+impl<'a> BooleanLiteral<'a> {
+    pub fn value(&self) -> bool { self.data().value }
+}
+
+// NullLiteral: no fields.
+
+impl<'a> StringLiteral<'a> {
+    pub fn value(&self) -> &'a str { &self.data().value }
+}
+
+impl<'a> IntLiteral<'a> {
+    pub fn value(&self) -> u64 { self.data().value }
+    pub fn suffix(&self) -> Option<IntLiteralSuffix> { self.data().suffix }
+}
+
+impl<'a> DotAccessExpression<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+    pub fn name(&self) -> &'a str { &self.data().name }
+}
+
+impl<'a> IndexAccessExpression<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+    pub fn access_exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().access_exp)
+    }
+}
+
+impl<'a> FunctionCallExpression<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+    pub fn args(&self) -> impl Iterator<Item = Expression<'a>> + 'a {
+        let model = self.model();
+        self.data().args.iter().map(move |&e| Expression::new(model, e))
+    }
+}
+
+impl<'a> NonNullAssertExpression<'a> {
+    pub fn exp(&self) -> Expression<'a> {
+        Expression::new(self.model(), self.data().exp)
+    }
+}
+
+impl<'a> IdentifierExpression<'a> {
+    pub fn name(&self) -> &'a str { &self.data().name }
 }
