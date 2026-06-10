@@ -479,3 +479,57 @@ pub struct IndexAccess {
 pub struct IdentifierExpression {
     pub name: String,
 }
+
+
+
+
+#[derive(Debug)]
+pub enum TypeSpec {
+    Primitive(PrimitiveTypeSpec),
+    Struct(StructTypeSpec),
+    Enum(EnumTypeSpec),
+    Named(NamedTypeSpec),
+}
+
+#[derive(Debug)]
+pub enum PrimitiveTypeSpec {
+    U8,
+    U16,
+    U32,
+    U64,
+    I8,
+    I16,
+    I32,
+    I64,
+    Int,
+    Boolean,
+    String,
+}
+
+#[derive(Debug)]
+pub struct StructTypeSpec {
+    pub fields: Vec<Parsed<StructFieldSpec>>
+}
+
+#[derive(Debug)]
+pub struct StructFieldSpec {
+    pub name: String,
+    pub type_spec: Box<TypeSpec>
+}
+
+#[derive(Debug)]
+pub struct EnumTypeSpec {
+    pub variants: Vec<Parsed<EnumVariantSpec>>
+}
+
+#[derive(Debug)]
+pub struct EnumVariantSpec {
+    pub name: String,
+    pub type_spec: Option<Box<TypeSpec>>
+}
+
+#[derive(Debug)]
+pub struct NamedTypeSpec {
+    pub qualifier: Vec<String>,
+    pub name: String,
+}
